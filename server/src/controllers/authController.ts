@@ -22,7 +22,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       res.status(400).json({ message: 'Please provide a valid email address' });
       return;
     }
