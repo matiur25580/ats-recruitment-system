@@ -180,6 +180,17 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.equal(repeated.response.status, 200);
       assert.equal(repeated.body.application.statusHistory.length, 2);
 
+      const accepted = await request(`/api/applications/${application._id}/status`, {
+        method: 'PUT', headers: bearer(recruiterToken), body: JSON.stringify({ status: 'Accepted' }),
+      });
+      assert.equal(accepted.response.status, 200);
+      assert.equal(accepted.body.application.statusHistory.length, 3);
+
+      const invalidTransition = await request(`/api/applications/${application._id}/status`, {
+        method: 'PUT', headers: bearer(recruiterToken), body: JSON.stringify({ status: 'Reviewed' }),
+      });
+      assert.equal(invalidTransition.response.status, 409);
+
       const forbiddenNote = await request(`/api/applications/${application._id}/notes`, {
         method: 'POST', headers: bearer(otherRecruiterToken), body: JSON.stringify({ note: 'Should not be saved' }),
       });
