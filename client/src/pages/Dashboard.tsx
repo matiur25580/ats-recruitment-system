@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Activity, ArrowUpRight, BriefcaseBusiness, CheckCircle2, Clock3, FileText,
+  Activity, ArrowUpRight, BriefcaseBusiness, CheckCircle2, Clock3, FileText, UserRound,
   LayoutDashboard, LogOut, MapPin, Plus, Search, Send, Sparkles,
   X, UploadCloud, Eye, Ban, Menu,
 } from 'lucide-react';
@@ -176,6 +176,7 @@ const Dashboard = () => {
             <div className="flex items-center gap-3 rounded-xl bg-violet-500/15 px-3 py-3 text-sm font-semibold text-violet-200"><LayoutDashboard size={18}/> Overview</div>
             <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400"><BriefcaseBusiness size={18}/> {isRecruiter ? 'My job posts' : 'Explore jobs'}</div>
             <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400"><FileText size={18}/> {isRecruiter ? 'Applicants' : 'My applications'}</div>
+            {!isRecruiter && <button onClick={() => navigate('/profile')} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-slate-400 transition hover:bg-white/5 hover:text-white"><UserRound size={18}/> My profile</button>}
           </nav>
           <div className="mt-auto rounded-2xl border border-white/10 bg-white/[.04] p-4">
             <div className="mb-3 flex items-center gap-2 text-violet-300"><Sparkles size={16}/><span className="text-xs font-semibold">AI-assisted hiring</span></div>
