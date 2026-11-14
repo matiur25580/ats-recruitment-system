@@ -203,7 +203,7 @@ export const getCandidateApplications = async (req: AuthRequest, res: Response):
   try {
     // Recruiter notes are private hiring-team data and must never reach candidate-facing APIs.
     const applications = await Application.find({ candidate: req.user._id })
-      .select('-recruiterNotes')
+      .select('-recruiterNotes -resumePublicId')
       .populate('job', 'title location salary jobType')
       .sort({ createdAt: -1 });
     res.json(applications);
