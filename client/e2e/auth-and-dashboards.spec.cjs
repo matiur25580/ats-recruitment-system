@@ -42,7 +42,7 @@ test('duplicate registration displays the API validation message', async ({ page
   await page.goto('/register');
   await page.getByLabel('Full name').fill('Existing Candidate');
   await page.getByLabel('Email address').fill('existing@example.test');
-  await page.getByLabel('Password').fill('StrongPass123!');
+  await page.locator('input[autocomplete="new-password"]').fill('StrongPass123!');
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByText('This email is already registered. Please log in.')).toBeVisible();
 });
@@ -54,7 +54,7 @@ test('unknown email login displays a clear registration message', async ({ page 
   }));
   await page.goto('/login');
   await page.getByLabel('Email address').fill('unknown@example.test');
-  await page.getByLabel('Password').fill('StrongPass123!');
+  await page.locator('input[autocomplete="current-password"]').fill('StrongPass123!');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByText('This email does not exist. Please register first.')).toBeVisible();
 });
@@ -76,8 +76,8 @@ test('forgot and reset password screens are usable on mobile', async ({ page }) 
     body: JSON.stringify({ message: 'Your password has been reset successfully. Please sign in with your new password.' }),
   }));
   await page.goto('/reset-password?token=e2e-reset-token');
-  await page.getByLabel('New password').fill('NewStrongPass123!');
-  await page.getByLabel('Confirm new password').fill('NewStrongPass123!');
+  await page.locator('input[autocomplete="new-password"]').nth(0).fill('NewStrongPass123!');
+  await page.locator('input[autocomplete="new-password"]').nth(1).fill('NewStrongPass123!');
   await page.getByRole('button', { name: 'Reset password' }).click();
   await expect(page).toHaveURL(/\/login$/);
 });
@@ -119,7 +119,7 @@ test('successful candidate registration enters the candidate workspace', async (
   await page.goto('/register');
   await page.getByLabel('Full name').fill(candidate.name);
   await page.getByLabel('Email address').fill(candidate.email);
-  await page.getByLabel('Password').fill('StrongPass123!');
+  await page.locator('input[autocomplete="new-password"]').fill('StrongPass123!');
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Your next opportunity starts here.' })).toBeVisible();
