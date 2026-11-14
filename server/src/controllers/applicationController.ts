@@ -9,6 +9,7 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 import cloudinary from '../config/cloudinary';
 import { analyzeResumeWithAI } from '../utils/aiService';
 import { sendEmail } from '../utils/mailer'; // ইমেইল ফাংশন ইম্পোর্ট
+import { isValidPdfBuffer } from '../utils/validation';
 
 const uploadToCloudinary = (fileBuffer: Buffer): Promise<{ public_id: string }> => {
   return new Promise((resolve, reject) => {
@@ -30,7 +31,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
   try {
     const { jobId } = req.params;
     const coverLetter = req.body?.coverLetter || '';
-    if (!req.file || req.file.mimetype !== 'application/pdf' || req.file.buffer.subarray(0, 5).toString() !== '%PDF-') {
+    if (!req.file || req.file.mimetype !== 'application/pdf' || !isValidPdfBuffer(req.file.buffer)) {
       res.status(400).json({ message: 'Please upload a valid PDF resume' });
       return;
     }
