@@ -38,7 +38,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
 
     const job = await Job.findById(jobId).populate('recruiter', 'email name');
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
-    if (job.status !== 'Open' || (job.expiresAt && job.expiresAt <= new Date())) {
+    if ((job.status && job.status !== 'Open') || (job.expiresAt && job.expiresAt <= new Date())) {
       res.status(409).json({ message: 'This job is no longer accepting applications' }); return;
     }
 
