@@ -13,6 +13,8 @@ async function mockDashboardApi(page, role) {
       }) });
     }
     if (url.pathname.endsWith('/applications/my-applications')) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    if (route.request().method() === 'POST' && url.pathname.endsWith('/applications/job-1')) return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ message: 'Application submitted successfully', application: { _id: 'application-1' } }) });
+    if (route.request().method() === 'POST' && url.pathname.endsWith('/jobs')) return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ _id: 'job-new', title: 'Platform Engineer' }) });
     if (url.pathname.endsWith('/stats/recruiter')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ totalJobs: 0, totalApplications: 0, averageMatchScore: 0, statusData: [] }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
@@ -121,4 +123,38 @@ test('successful candidate registration enters the candidate workspace', async (
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Your next opportunity starts here.' })).toBeVisible();
+});
+
+test('candidate can submit an application and sees success feedback', async ({ page }) => {
+  await page.addInitScript((user) => {
+    localStorage.setItem('token', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, candidate);
+  await mockDashboardApi(page, 'candidate');
+  await page.goto('/dashboard');
+  await page.getByRole('button', { name: 'Apply for this role' }).click();
+  await page.getByLabel('Cover letter').fill('I am excited to apply for this role.');
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'candidate-resume.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.7\\nHireFlow browser test resume'),
+  });
+  await page.getByRole('button', { name: 'Submit application' }).click();
+  await expect(page.getByText('Application submitted successfully')).toBeVisible();
+});
+
+test('recruiter can publish a job and sees success feedback', async ({ page }) => {
+  await page.addInitScript((user) => {
+    localStorage.setItem('token', 'e2e-token');
+    localStorage.setItem('user', JSON.stringify(user));
+  }, recruiter);
+  await mockDashboardApi(page, 'recruiter');
+  await page.goto('/dashboard');
+  await page.getByRole('button', { name: 'Post a new job' }).click();
+  await page.getByLabel('Job title').fill('Platform Engineer');
+  await page.getByLabel('Location').fill('Remote');
+  await page.getByLabel('Salary').fill('95000');
+  await page.getByLabel('Job description').fill('Build secure, scalable recruitment workflows.');
+  await page.getByRole('button', { name: 'Publish job' }).click();
+  await expect(page.getByText('Your job is now live')).toBeVisible();
 });
