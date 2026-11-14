@@ -300,7 +300,7 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.ok(capturedResetEmail?.text);
       const resetUrl = capturedResetEmail.text.match(/http:\/\/localhost:5173\/reset-password\?token=([a-f0-9]+)/)?.[0];
       assert.ok(resetUrl, 'reset email should contain a frontend reset URL');
-      const resetToken = new URL(resetUrl).searchParams.get('token');
+      const resetToken = new URL(resetUrl).hash.slice(1).split('=')[1];
 
       const reset = await request('/api/auth/reset-password', {
         method: 'POST', body: JSON.stringify({ token: resetToken, password: 'NewStrongPass123!' }),
