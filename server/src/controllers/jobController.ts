@@ -5,6 +5,7 @@
 import { Response } from 'express';
 import Job from '../models/Job';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { recordAuditEvent } from '../utils/audit';
 
 const allowedJobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'] as const;
 const allowedExperienceLevels = ['Entry', 'Mid', 'Senior'] as const;
@@ -45,6 +46,7 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
       ...(expiresAt ? { expiresAt } : {}),
       recruiter: req.user._id,
     });
+    await recordAuditEvent({ actorId: req.user._id, action: 'job.created', entityType: 'Job', entityId: createdJob._id, metadata: { status: createdJob.status }, requestId: req.header('x-request-id') });
     res.status(201).json(createdJob);
   } catch (error: unknown) {
     console.error('Failed to create job', error);
@@ -120,6 +122,7 @@ export const updateJob = async (req: AuthRequest, res: Response): Promise<void> 
     }
     Object.assign(job, normalizedJobDetails(req.body));
     await job.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'job.updated', entityType: 'Job', entityId: job._id, metadata: { status: job.status }, requestId: req.header('x-request-id') });
     res.json(job);
   } catch (error: unknown) {
     console.error('Failed to update job', error);
@@ -144,8 +147,10 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
     if (status === 'Open' && job.expiresAt && job.expiresAt <= new Date()) {
       res.status(409).json({ message: 'Update the expiry date before reopening this job' }); return;
     }
+    const previousStatus = job.status;
     job.status = status;
     await job.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'job.status_changed', entityType: 'Job', entityId: job._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
     res.json({ message: `Job ${status.toLowerCase()} successfully`, job });
   } catch (error: unknown) {
     console.error('Failed to change job lifecycle', error);
