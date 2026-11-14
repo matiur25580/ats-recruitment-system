@@ -18,16 +18,18 @@ async function mockDashboardApi(page, role) {
   });
 }
 
-test('login and registration screens render without horizontal overflow on mobile', async ({ page }) => {
+test('login and registration screens render without horizontal overflow on mobile', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'Sign in to your workspace' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Forgot password?' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: testInfo.outputPath('login-mobile.png'), fullPage: true });
 
   await page.goto('/register');
   await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: testInfo.outputPath('registration-mobile.png'), fullPage: true });
 });
 
 test('duplicate registration displays the API validation message', async ({ page }) => {
@@ -78,7 +80,7 @@ test('forgot and reset password screens are usable on mobile', async ({ page }) 
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test('candidate dashboard loads job discovery and application workspace', async ({ page }) => {
+test('candidate dashboard loads job discovery and application workspace', async ({ page }, testInfo) => {
   await page.addInitScript((user) => {
     localStorage.setItem('token', 'e2e-token');
     localStorage.setItem('user', JSON.stringify(user));
@@ -89,9 +91,10 @@ test('candidate dashboard loads job discovery and application workspace', async 
   await expect(page.getByText('Frontend Engineer')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'My applications' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: testInfo.outputPath('candidate-dashboard.png'), fullPage: true });
 });
 
-test('recruiter dashboard loads hiring workspace and opens the job form', async ({ page }) => {
+test('recruiter dashboard loads hiring workspace and opens the job form', async ({ page }, testInfo) => {
   await page.addInitScript((user) => {
     localStorage.setItem('token', 'e2e-token');
     localStorage.setItem('user', JSON.stringify(user));
@@ -102,4 +105,20 @@ test('recruiter dashboard loads hiring workspace and opens the job form', async 
   await page.getByRole('button', { name: 'Post a new job' }).click();
   await expect(page.getByRole('heading', { name: 'Publish a new role' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
+  await page.screenshot({ path: testInfo.outputPath('recruiter-dashboard-job-form.png'), fullPage: true });
+});
+
+test('successful candidate registration enters the candidate workspace', async ({ page }) => {
+  await mockDashboardApi(page, 'candidate');
+  await page.route('**/api/auth/register', route => route.fulfill({
+    status: 201, contentType: 'application/json',
+    body: JSON.stringify({ token: 'e2e-token', ...candidate }),
+  }));
+  await page.goto('/register');
+  await page.getByLabel('Full name').fill(candidate.name);
+  await page.getByLabel('Email address').fill(candidate.email);
+  await page.getByLabel('Password').fill('StrongPass123!');
+  await page.getByRole('button', { name: 'Create account' }).click();
+  await expect(page).toHaveURL(/\\/dashboard$/);
+  await expect(page.getByRole('heading', { name: 'Your next opportunity starts here.' })).toBeVisible();
 });
