@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CandidateProfile from './pages/CandidateProfile';
+import AdminDashboard from './pages/AdminDashboard';
 
 // Route guard: checks the saved session before rendering pages that require login.
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -55,7 +56,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              {JSON.parse(localStorage.getItem('user') || '{}').role === 'admin' ? <AdminDashboard /> : <Dashboard />}
             </ProtectedRoute>
           }
         />
