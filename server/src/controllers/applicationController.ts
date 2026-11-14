@@ -82,6 +82,10 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
         console.error('Failed to remove an unclaimed resume upload', cleanupError);
       }
     }
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
+      res.status(409).json({ message: 'You have already applied to this job' });
+      return;
+    }
     console.error('Failed to submit application', error);
     res.status(500).json({ message: 'Unable to submit application' });
   }
@@ -174,7 +178,9 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
 
 export const getCandidateApplications = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    // Recruiter notes are private hiring-team data and must never reach candidate-facing APIs.
     const applications = await Application.find({ candidate: req.user._id })
+      .select('-recruiterNotes')
       .populate('job', 'title location salary jobType')
       .sort({ createdAt: -1 });
     res.json(applications);
