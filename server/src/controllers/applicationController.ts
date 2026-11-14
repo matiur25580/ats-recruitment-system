@@ -5,6 +5,7 @@
 import { Response } from 'express';
 import Application from '../models/Application';
 import Job from '../models/Job';
+import User from '../models/User';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import cloudinary from '../config/cloudinary';
 import { analyzeResumeWithAI } from '../utils/aiService';
@@ -130,8 +131,32 @@ export const getJobApplications = async (req: AuthRequest, res: Response): Promi
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
     if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
     
-    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
-    res.json(applications);
+    const pageValue = Number(req.query.page ?? 1);
+    const limitValue = Number(req.query.limit ?? 10);
+    const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+    const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 50) : 10;
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
+    const filter: Record<string, unknown> = { job: jobId };
+    if (['Pending', 'Reviewed', 'Accepted', 'Rejected'].includes(status)) filter.status = status;
+    if (q) {
+      const candidates = await User.find({ $or: [
+        { name: { $regex: q.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
+    res.json(applications);'), $options: 'i' } },
+        { email: { $regex: q.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
+    res.json(applications);'), $options: 'i' } },
+      ] }).select('_id').limit(100);
+      filter.$or = [
+        { candidate: { $in: candidates.map((candidate) => candidate._id) } },
+        { coverLetter: { $regex: q.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
+    res.json(applications);'), $options: 'i' } },
+      ];
+    }
+    const [items, total] = await Promise.all([
+      Application.find(filter).populate('candidate', 'name email').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      Application.countDocuments(filter),
+    ]);
+    res.json({ items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error: unknown) {
     console.error('Failed to retrieve job applications', error);
     res.status(500).json({ message: 'Unable to retrieve applications' });
