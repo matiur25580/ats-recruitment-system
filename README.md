@@ -179,6 +179,7 @@ CLOUDINARY_API_SECRET=
 
 # Optional: AI resume analysis
 GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash-lite
 
 # Optional: email notifications (SMTP credentials)
 EMAIL_USER=
@@ -285,6 +286,7 @@ Authorization: Bearer <your-jwt>
 | `npm run build` | Build the production frontend |
 | `npm run lint` | Run Oxlint |
 | `npm run preview` | Preview the production build locally |
+| `npx playwright test` | Run desktop/mobile browser E2E tests (install `@playwright/test` and Chromium first) |
 
 ### Backend (`server`)
 
@@ -294,7 +296,7 @@ Authorization: Bearer <your-jwt>
 | `npm run build` | Compile TypeScript into `server/dist` |
 | `npm start` | Start the compiled API |
 
-> **Testing status:** automated backend validation and MongoDB-backed API integration tests run in CI. The suite covers role restrictions, duplicate/unknown-email feedback, password recovery and session revocation, job ownership, application workflows, candidate/recruiter resume access, private Cloudinary SDK contract behavior, admin audit access and email retry behavior. External Cloudinary, SMTP and Gemini services are stubbed or omitted in CI; configure real credentials and run a deployment smoke test before production use.
+ > **Testing status:** backend validation and MongoDB-backed API integration tests run in CI, alongside Playwright browser checks for login, registration, password recovery and candidate/recruiter dashboards on desktop and mobile viewports. Cloudinary, SMTP and Gemini provider calls are deliberately not faked as live checks in normal CI; use the manual production smoke workflow below with real secrets before deployment.
 
 ## Search, pagination and auditability
 
@@ -304,18 +306,40 @@ Authorization: Bearer <your-jwt>
 - Audit events record job creation/updates/status changes, application submissions/status changes and recruiter notes. They store safe metadata only—not resume bytes, credentials or request bodies.
 - SMTP can use Gmail via `EMAIL_USER` / `EMAIL_PASS`, or a generic provider via `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` and the same credentials. Delivery retries once; notification failure does not roll back a saved application or status.
 
+## Production integration verification
+
+A manual GitHub Actions workflow is available at **Actions → Production integration smoke test → Run workflow**. It uploads a temporary private PDF to Cloudinary, downloads it through a signed URL, sends that PDF through Gemini analysis, sends one test email through the configured SMTP provider, and checks the deployed API and frontend HTTP endpoints. The temporary Cloudinary object is deleted after the run.
+
+Before running it, create a GitHub Actions environment named `production-smoke` and configure:
+
+**Environment secrets**
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `GEMINI_API_KEY`
+- `EMAIL_USER`
+- `EMAIL_PASS`
+- `SMOKE_TEST_EMAIL` — a mailbox you control; the workflow sends one test message here.
+
+**Environment variables**
+- `SMOKE_API_URL` — deployed API origin, e.g. `https://api.example.com` (the workflow checks `/health`).
+- `SMOKE_FRONTEND_URL` — deployed frontend origin.
+- `GEMINI_MODEL` — optional model override; defaults to `gemini-3.5-flash-lite`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `EMAIL_FROM` — optional generic SMTP configuration; omit `SMTP_HOST` to use Gmail service configuration.
+
+The smoke workflow intentionally requires real provider credentials and is manual to prevent accidental email sends or provider charges on every push. A successful SMTP handoff does not prove inbox placement or bounce handling; inspect the destination inbox and provider delivery logs as well.
+
 ## Remaining production-readiness work
 
-The core candidate/recruiter workflows, job lifecycle, pagination, audit events and CI checks are implemented. Before treating this as a production deployment, the following still require environment-specific work:
+The core candidate/recruiter workflows, job lifecycle, pagination, audit events, backend integration tests and desktop/mobile browser checks are implemented. Before treating this as a production deployment, these environment-specific items still require owner action or further validation:
 
-1. Configure and verify real Cloudinary credentials, signed private downloads and storage retention in the target account.
-2. Configure SMTP credentials and verify sender reputation, delivery, bounce handling and operational alerting.
-3. Configure Gemini credentials and validate extraction/analysis on representative, valid PDF resumes; AI remains advisory.
-4. Add email verification, account lifecycle controls and optional MFA.
-5. Add frontend component/browser E2E coverage and load/performance testing.
-6. Define production backups, monitoring, incident response, privacy retention and compliance policies.
+1. Run the production integration smoke workflow with real Cloudinary, SMTP and Gemini credentials, then inspect the received email and provider logs.
+2. Verify deployment-specific HTTPS, exact `CORS_ORIGIN`, `VITE_API_URL`, secure environment secrets and database connectivity.
+3. Run load/performance testing against production-like infrastructure and validate MongoDB backup/restore.
+4. Define monitoring, incident response, privacy retention and applicable compliance policies.
+5. Add email verification, account lifecycle controls and optional MFA.
 
-A green CI run proves the checked-in code builds and the automated tests pass; it does not certify external provider credentials, deployment infrastructure or legal/compliance readiness.
+A green CI run proves the checked-in code builds and the automated tests pass; only a successful smoke run proves the configured external integrations answered the tested requests. Neither certifies legal/compliance readiness.
 
 ## Learning and interview preparation
 
