@@ -13,6 +13,14 @@ import CandidateProfile from './pages/CandidateProfile';
 import AdminDashboard from './pages/AdminDashboard';
 
 // Route guard: checks the saved session before rendering pages that require login.
+const getStoredRole = (): string => {
+  try {
+    return JSON.parse(localStorage.getItem('user') || '{}')?.role || '';
+  } catch {
+    return '';
+  }
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('token');
   const rawUser = localStorage.getItem('user');
@@ -60,7 +68,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              {JSON.parse(localStorage.getItem('user') || '{}').role === 'admin' ? <AdminDashboard /> : <Dashboard />}
+              {getStoredRole() === 'admin' ? <AdminDashboard /> : <Dashboard />}
             </ProtectedRoute>
           }
         />
