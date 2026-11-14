@@ -1,8 +1,10 @@
 /*
- * LEARNING NOTE: Mongoose Job model: validates job details and links every job to its creating recruiter.
- * Interview tip: explain what data this layer owns and which layer calls it.
+ * LEARNING NOTE: Mongoose Job model owns job content, lifecycle state, expiry, and recruiter ownership.
+ * Interview tip: explain why lifecycle state is persisted rather than inferred from UI visibility.
  */
 import mongoose, { Document, Schema } from 'mongoose';
+
+export type JobStatus = 'Open' | 'Closed' | 'Archived';
 
 export interface IJob extends Document {
   title: string;
@@ -13,34 +15,25 @@ export interface IJob extends Document {
   jobType: 'Full-time' | 'Part-time' | 'Contract' | 'Internship';
   experienceLevel: 'Entry' | 'Mid' | 'Senior';
   recruiter: mongoose.Types.ObjectId;
+  status: JobStatus;
+  expiresAt?: Date;
 }
 
-// Job schema: defines the shape and constraints of job documents stored in MongoDB.
 const jobSchema: Schema = new Schema(
   {
-    title: { type: String, required: true },
-    description: { type: String, required: true },
-    requirements: [{ type: String }],
-    location: { type: String, required: true },
-    salary: { type: Number, required: true },
-    jobType: {
-      type: String,
-      enum: ['Full-time', 'Part-time', 'Contract', 'Internship'],
-      required: true,
-    },
-    experienceLevel: {
-      type: String,
-      enum: ['Entry', 'Mid', 'Senior'],
-      required: true,
-    },
-    recruiter: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
+    title: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
+    requirements: [{ type: String, trim: true }],
+    location: { type: String, required: true, trim: true },
+    salary: { type: Number, required: true, min: 0 },
+    jobType: { type: String, enum: ['Full-time', 'Part-time', 'Contract', 'Internship'], required: true },
+    experienceLevel: { type: String, enum: ['Entry', 'Mid', 'Senior'], required: true },
+    recruiter: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    status: { type: String, enum: ['Open', 'Closed', 'Archived'], default: 'Open', index: true },
+    expiresAt: { type: Date },
   },
   { timestamps: true }
 );
 
-const Job = mongoose.model<IJob>('Job', jobSchema);
-export default Job;
+jobSchema.index({ status: 1, expiresAt: 1, createdAt: -1 });
+export default mongoose.model<IJob>('Job', jobSchema);

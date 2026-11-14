@@ -9,6 +9,7 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 import cloudinary from '../config/cloudinary';
 import { analyzeResumeWithAI } from '../utils/aiService';
 import { sendEmail } from '../utils/mailer'; // ইমেইল ফাংশন ইম্পোর্ট
+import { isValidPdfBuffer } from '../utils/validation';
 
 const uploadToCloudinary = (fileBuffer: Buffer): Promise<{ public_id: string }> => {
   return new Promise((resolve, reject) => {
@@ -30,13 +31,16 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
   try {
     const { jobId } = req.params;
     const coverLetter = req.body?.coverLetter || '';
-    if (!req.file || req.file.mimetype !== 'application/pdf' || req.file.buffer.subarray(0, 5).toString() !== '%PDF-') {
+    if (!req.file || req.file.mimetype !== 'application/pdf' || !isValidPdfBuffer(req.file.buffer)) {
       res.status(400).json({ message: 'Please upload a valid PDF resume' });
       return;
     }
 
     const job = await Job.findById(jobId).populate('recruiter', 'email name');
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
+    if ((job.status && job.status !== 'Open') || (job.expiresAt && job.expiresAt <= new Date())) {
+      res.status(409).json({ message: 'This job is no longer accepting applications' }); return;
+    }
 
     // Check before uploading: a duplicate request should not create an orphaned file.
     const alreadyApplied = await Application.findOne({ job: jobId, candidate: req.user._id });
@@ -53,6 +57,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
       matchScore: aiAnalysis?.matchScore,
       aiSummary: aiAnalysis?.aiSummary,
       aiAnalysisStatus: aiAnalysis ? 'completed' : 'unavailable',
+      statusHistory: [{ status: 'Pending', changedBy: req.user._id, changedAt: new Date() }],
     });
 
     await application.save();
@@ -143,6 +148,7 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
     
     application.status = status;
+    application.statusHistory.push({ status, changedBy: req.user._id, changedAt: new Date() });
     await application.save();
 
     // ক্যান্ডিডেটকে ইমেইল পাঠানো
@@ -174,5 +180,28 @@ export const getCandidateApplications = async (req: AuthRequest, res: Response):
     res.json(applications);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+
+export const addRecruiterNote = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const note = req.body?.note;
+    if (typeof note !== 'string' || !note.trim() || note.trim().length > 2000) {
+      res.status(400).json({ message: 'Note must contain 1 to 2000 characters' }); return;
+    }
+    const application = await Application.findById(req.params.appId);
+    if (!application) { res.status(404).json({ message: 'Application not found' }); return; }
+    const job = await Job.findById(application.job).select('recruiter');
+    if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
+    if (job.recruiter.toString() !== req.user._id.toString()) {
+      res.status(403).json({ message: 'Not authorized to add notes to this application' }); return;
+    }
+    application.recruiterNotes.push({ author: req.user._id, note: note.trim(), createdAt: new Date() });
+    await application.save();
+    res.status(201).json({ message: 'Recruiter note added', notes: application.recruiterNotes });
+  } catch (error: unknown) {
+    console.error('Failed to add recruiter note', error);
+    res.status(500).json({ message: 'Unable to add recruiter note' });
   }
 };
