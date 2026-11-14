@@ -41,6 +41,14 @@ const Dashboard = () => {
   const [coverLetter, setCoverLetter] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [jobTypeFilter, setJobTypeFilter] = useState('');
+  const [jobPage, setJobPage] = useState(1);
+  const [jobPagination, setJobPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [applicantPage, setApplicantPage] = useState(1);
+  const [applicantPagination, setApplicantPagination] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [applicantSearch, setApplicantSearch] = useState('');
+  const [applicantStatus, setApplicantStatus] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -65,8 +73,10 @@ const Dashboard = () => {
     try {
       const jobsRequest = api.get(current.role === 'recruiter' ? '/jobs/mine' : '/jobs');
       const jobsResponse = await jobsRequest;
-      const allJobs = Array.isArray(jobsResponse.data) ? jobsResponse.data : [];
+      const allJobs = Array.isArray(jobsResponse.data?.items) ? jobsResponse.data.items : [];
       setJobs(allJobs);
+      setJobPagination(jobsResponse.data?.pagination || { page: 1, totalPages: 1, total: allJobs.length });
+      setJobPage(jobsResponse.data?.pagination?.page || 1);
       if (current.role === 'candidate') {
         const response = await api.get('/applications/my-applications');
         setMyApplications(Array.isArray(response.data) ? response.data : []);
@@ -80,9 +90,21 @@ const Dashboard = () => {
     } finally { setPageLoading(false); }
   };
 
-  const filteredJobs = useMemo(() => jobs.filter(job =>
-    `${job.title} ${job.location} ${job.jobType}`.toLowerCase().includes(searchTerm.toLowerCase())
-  ), [jobs, searchTerm]);
+  const filteredJobs = useMemo(() => jobs, [jobs]);
+
+  const loadJobs = async (current: User, page = 1) => {
+    try {
+      const params: Record<string, string | number> = { page, limit: 12 };
+      if (searchTerm.trim()) params.q = searchTerm.trim();
+      if (current.role !== 'recruiter' && jobTypeFilter) params.jobType = jobTypeFilter;
+      const response = await api.get(current.role === 'recruiter' ? '/jobs/mine' : '/jobs', { params });
+      setJobs(Array.isArray(response.data?.items) ? response.data.items : []);
+      setJobPagination(response.data?.pagination || { page: 1, totalPages: 1, total: 0 });
+      setJobPage(response.data?.pagination?.page || page);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Unable to search jobs');
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login');
@@ -113,11 +135,16 @@ const Dashboard = () => {
     } finally { setLoading(false); }
   };
 
-  const handleViewApplicants = async (job: Job) => {
-    setLoading(true); setSelectedJobApplicants(null); setActiveJobTitle(job.title);
+  const handleViewApplicants = async (job: Job, page = 1) => {
+    setLoading(true); setSelectedJobApplicants(null); setActiveJobTitle(job.title); setActiveJobId(job._id);
     try {
-      const response = await api.get(`/applications/${job._id}`);
-      setSelectedJobApplicants(Array.isArray(response.data) ? response.data : []);
+      const params: Record<string, string | number> = { page, limit: 10 };
+      if (applicantSearch.trim()) params.q = applicantSearch.trim();
+      if (applicantStatus) params.status = applicantStatus;
+      const response = await api.get(`/applications/${job._id}`, { params });
+      setSelectedJobApplicants(Array.isArray(response.data?.items) ? response.data.items : []);
+      setApplicantPagination(response.data?.pagination || { page: 1, totalPages: 1, total: 0 });
+      setApplicantPage(response.data?.pagination?.page || page);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unable to load applicants');
     } finally { setLoading(false); }
@@ -128,7 +155,7 @@ const Dashboard = () => {
       await api.put(`/applications/${applicationId}/status`, { status });
       toast.success(`Application marked ${status.toLowerCase()}`);
       if (user) await loadDashboard(user);
-      const job = jobs.find(item => item.title === activeJobTitle);
+      const job = jobs.find(item => item._id === activeJobId);
       if (job) await handleViewApplicants(job);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unable to update application');
