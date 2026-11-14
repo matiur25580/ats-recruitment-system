@@ -47,32 +47,6 @@ The platform includes **AI-assisted resume-to-job analysis** to provide an addit
 
 > **Responsible hiring:** AI match scores are decision-support signals, not objective measures of candidate quality. Recruiters must review applications themselves and should never rely on an AI score as the sole hiring criterion.
 
-## People behind every great hire
-
-The images below are illustrative portraits and workplace photography representing the two people who use HireFlow. They are **not application screenshots or real HireFlow users**.
-
-### Candidate experience
-
-| Discovering opportunities | Building a profile |
-|---|---|
-| <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional man" /> | <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional woman" /> |
-| <img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, smiling professional" /> | <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, confident professional" /> |
-| <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional headshot" /> | <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional woman headshot" /> |
-| <img src="https://images.unsplash.com/photo-1507591064344-4c6ce005b128?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait in a workplace" /> | <img src="https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate collaborating with colleagues" /> |
-
-### Recruiter experience
-
-| Hiring conversations | Team collaboration |
-|---|---|
-| <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruiter professional portrait" /> | <img src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruiter discussing candidates with a colleague" /> |
-| <img src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruitment team working together" /> | <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=720&q=85" width="320" alt="Hiring team collaborating at a table" /> |
-| <img src="https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruiter team meeting" /> | <img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruitment planning session" /> |
-| <img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=720&q=85" width="320" alt="Professional team discussion" /> | <img src="https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=720&q=85" width="320" alt="Colleagues in a collaborative workplace" /> |
-
-### Product interface
-
-The current UI is implemented in the `client/` application. Product screenshots will be added after a verified browser walkthrough so that the README never presents mockups as live application screens.
-
 ## Technology stack
 
 | Layer | Technologies |
@@ -370,3 +344,61 @@ Before opening a pull request:
 ## License
 
 No license file is currently included. Contact the repository owner before redistributing or reusing this project.
+
+---
+
+## Product dashboard gallery
+
+A laptop-format, single-column tour of the HireFlow candidate and recruiter workspaces. These are **illustrative interface concepts** for the documented product workflows—not captured production screenshots. The labels identify the primary application layer represented in each view.
+
+### Candidate workspace — 6 screens
+
+**01 · Candidate dashboard** — Frontend · Candidate portal
+
+<img src="docs/images/dashboard-01.svg" alt="HireFlow candidate dashboard overview, frontend" width="100%" />
+
+**02 · Explore jobs** — Frontend · Job discovery and filters
+
+<img src="docs/images/dashboard-02.svg" alt="HireFlow candidate job discovery dashboard, frontend" width="100%" />
+
+**03 · My applications** — Frontend · Application tracking
+
+<img src="docs/images/dashboard-03.svg" alt="HireFlow candidate applications dashboard, frontend" width="100%" />
+
+**04 · Candidate profile** — Frontend · Profile and resume management
+
+<img src="docs/images/dashboard-04.svg" alt="HireFlow candidate profile dashboard, frontend" width="100%" />
+
+**05 · AI resume insights** — Backend + Frontend · Gemini analysis and results presentation
+
+<img src="docs/images/dashboard-05.svg" alt="HireFlow AI resume insights dashboard, backend and frontend" width="100%" />
+
+**06 · Application details** — Frontend + API · Application timeline and status
+
+<img src="docs/images/dashboard-06.svg" alt="HireFlow candidate application details, frontend and API" width="100%" />
+
+### Recruiter workspace — 6 screens
+
+**07 · Hiring overview** — Frontend · Recruitment metrics and funnel
+
+<img src="docs/images/dashboard-07.svg" alt="HireFlow recruiter hiring overview dashboard, frontend" width="100%" />
+
+**08 · Job management** — Frontend + Backend · Job publishing and lifecycle
+
+<img src="docs/images/dashboard-08.svg" alt="HireFlow recruiter job management dashboard, frontend and backend" width="100%" />
+
+**09 · Applicant pipeline** — Frontend + API · Applicant search and filtering
+
+<img src="docs/images/dashboard-09.svg" alt="HireFlow recruiter applicant pipeline, frontend and API" width="100%" />
+
+**10 · Candidate review** — Frontend · Candidate profile and resume review
+
+<img src="docs/images/dashboard-10.svg" alt="HireFlow recruiter candidate review dashboard, frontend" width="100%" />
+
+**11 · Application review** — Frontend + Backend · Status changes and recruiter notes
+
+<img src="docs/images/dashboard-11.svg" alt="HireFlow recruiter application review, frontend and backend" width="100%" />
+
+**12 · Recruitment analytics** — Frontend + API · Hiring performance insights
+
+<img src="docs/images/dashboard-12.svg" alt="HireFlow recruiter recruitment analytics dashboard, frontend and API" width="100%" />
