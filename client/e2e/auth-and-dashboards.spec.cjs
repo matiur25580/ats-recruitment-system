@@ -119,6 +119,6 @@ test('successful candidate registration enters the candidate workspace', async (
   await page.getByLabel('Email address').fill(candidate.email);
   await page.getByLabel('Password').fill('StrongPass123!');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole('heading', { name: 'Your next opportunity starts here.' })).toBeVisible();
 });
