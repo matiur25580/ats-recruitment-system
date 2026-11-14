@@ -57,6 +57,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
       matchScore: aiAnalysis?.matchScore,
       aiSummary: aiAnalysis?.aiSummary,
       aiAnalysisStatus: aiAnalysis ? 'completed' : 'unavailable',
+      statusHistory: [{ status: 'Pending', changedBy: req.user._id, changedAt: new Date() }],
     });
 
     await application.save();
@@ -146,7 +147,6 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     const job = application.job as any;
     if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
     
-    const previousStatus = application.status;
     application.status = status;
     application.statusHistory.push({ status, changedBy: req.user._id, changedAt: new Date() });
     await application.save();
