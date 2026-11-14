@@ -4,11 +4,12 @@
  */
 import express from 'express';
 import { registerUser, loginUser } from '../controllers/authController';
+import { authRateLimit } from '../middlewares/authRateLimit';
 
 const router = express.Router();
 
 // POST /register creates a public candidate account; role assignment is controlled by the server.
-router.post('/register', registerUser);
-router.post('/login', loginUser);
+router.post('/register', authRateLimit, registerUser);
+router.post('/login', authRateLimit, loginUser);
 
 export default router;
