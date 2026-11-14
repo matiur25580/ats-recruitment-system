@@ -20,8 +20,7 @@ async function mockDashboardApi(page, role) {
   });
 }
 
-test('login and registration screens render without horizontal overflow on mobile', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 375, height: 812 });
+test('login and registration screens render without horizontal overflow across desktop and mobile viewports', async ({ page }, testInfo) => {
   await page.goto('/login');
   await expect(page.getByRole('heading', { name: 'Sign in to your workspace' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Forgot password?' })).toBeVisible();
@@ -59,8 +58,7 @@ test('unknown email login displays a clear registration message', async ({ page 
   await expect(page.getByText('This email does not exist. Please register first.')).toBeVisible();
 });
 
-test('forgot and reset password screens are usable on mobile', async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 812 });
+test('forgot and reset password screens are usable across desktop and mobile viewports', async ({ page }) => {
   await page.route('**/api/auth/forgot-password', route => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ message: 'If an account exists for this email, password reset instructions will be sent shortly.' }),
