@@ -298,7 +298,7 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.equal(requested.response.status, 200);
       assert.match(requested.body.message, /If an account exists/);
       assert.ok(capturedResetEmail?.text);
-      const resetUrl = capturedResetEmail.text.match(/http:\/\/localhost:5173\/reset-password\?token=([a-f0-9]+)/)?.[0];
+      const resetUrl = capturedResetEmail.text.match(/http:\/\/localhost:5173\/reset-password#token=([a-f0-9]+)/)?.[0];
       assert.ok(resetUrl, 'reset email should contain a frontend reset URL');
       const resetToken = new URL(resetUrl).hash.slice(1).split('=')[1];
 
