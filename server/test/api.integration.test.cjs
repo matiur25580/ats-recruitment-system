@@ -68,6 +68,7 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
         body: JSON.stringify({ name: 'Duplicate', email: 'candidate.integration@example.test', password: 'StrongPass123!' }),
       });
       assert.equal(duplicate.response.status, 409);
+      assert.equal(duplicate.body.message, 'This email is already registered. Please log in.');
 
       const login = await request('/api/auth/login', {
         method: 'POST',
@@ -77,6 +78,18 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.equal(login.body.role, 'candidate');
       assert.ok(login.body.token);
       candidateToken = login.body.token;
+
+      const unknownEmail = await request('/api/auth/login', {
+        method: 'POST', body: JSON.stringify({ email: 'not.registered@example.test', password: 'StrongPass123!' }),
+      });
+      assert.equal(unknownEmail.response.status, 404);
+      assert.equal(unknownEmail.body.message, 'This email does not exist. Please register first.');
+
+      const wrongPassword = await request('/api/auth/login', {
+        method: 'POST', body: JSON.stringify({ email: 'candidate.integration@example.test', password: 'WrongPass123!' }),
+      });
+      assert.equal(wrongPassword.response.status, 401);
+      assert.equal(wrongPassword.body.message, 'Incorrect password. Please try again.');
     });
 
     await t.test('missing, malformed and wrong-role credentials are rejected', async () => {
