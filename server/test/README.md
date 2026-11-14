@@ -27,7 +27,10 @@ Use a dedicated disposable test database. The integration suite drops that datab
 - Duplicate application prevention before external resume storage is called
 - Candidate response privacy (no recruiter notes or private storage identifiers)
 - Recruiter-only application visibility and note creation
+- Application and candidate-profile resume upload flows using a deterministic Cloudinary SDK stub, private download URL generation, and profile resume deletion
+- Admin-only paginated audit feed and safe activity metadata
+- SMTP input validation, transient retry and permanent failure behavior using a fake transport
 - Resume download authorization for the candidate and owning recruiter, with unrelated recruiters denied
 - Application status history, idempotent updates, allowed transitions, and candidate write denial
 
-The resume URL test verifies authorization and URL generation only. It does not upload/download a real file from Cloudinary. External email delivery and Gemini analysis are intentionally not invoked by these tests.
+Cloudinary is replaced with a deterministic SDK stub: tests exercise the upload controller, validation, persistence, authorization, URL generation and cleanup paths, but do not contact a real Cloudinary account or download a real remote file. SMTP retry behavior is tested with an injected fake transport; live delivery is not attempted. Gemini is not invoked against a live API, and the integration test deliberately uses a minimal PDF fixture to verify graceful AI unavailability.
