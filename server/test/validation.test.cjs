@@ -18,7 +18,7 @@ test('password validation enforces the minimum length', () => {
 });
 
 test('PDF validation checks the file signature, not only the MIME type', () => {
-  assert.equal(isValidPdfBuffer(Buffer.from('%PDF-1.7\\nbody')), true);
+  assert.equal(isValidPdfBuffer(Buffer.from('%PDF-1.7 body')), true);
   assert.equal(isValidPdfBuffer(Buffer.from('not a PDF')), false);
   assert.equal(isValidPdfBuffer(Buffer.from('%PD')), false);
 });
