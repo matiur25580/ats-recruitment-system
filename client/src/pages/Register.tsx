@@ -5,7 +5,7 @@ import api from '../services/api';
 import toast from 'react-hot-toast';
 
 const Register = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '', role: 'candidate' });
+  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ const Register = () => {
     setSubmitting(true);
     const loadingToast = toast.loading('Creating your account…');
     try {
-      const response = await api.post('/auth/register', { ...formData, name: formData.name.trim(), email: formData.email.trim() });
+      const response = await api.post('/auth/register', { name: formData.name.trim(), email: formData.email.trim(), password: formData.password });
       localStorage.setItem('token', response.data.token);
       localStorage.setItem('user', JSON.stringify(response.data));
       toast.success('Your workspace is ready!', { id: loadingToast });
@@ -58,10 +58,6 @@ const Register = () => {
               <label className="block text-sm font-semibold text-slate-700">Password
                 <span className="relative mt-2 block"><LockKeyhole size={17} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"/><input type={showPassword?'text':'password'} autoComplete="new-password" required value={formData.password} onChange={event=>setFormData({...formData,password:event.target.value})} placeholder="Create a password" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-12 text-sm font-normal outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:bg-white focus:ring-4 focus:ring-violet-100"/><button type="button" onClick={()=>setShowPassword(value=>!value)} aria-label={showPassword?'Hide password':'Show password'} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700">{showPassword?<EyeOff size={17}/>:<Eye size={17}/>}</button></span>
               </label>
-              <fieldset className="pt-1"><legend className="mb-2 text-sm font-semibold text-slate-700">I want to join as</legend><div className="grid grid-cols-2 gap-3">
-                <button type="button" onClick={()=>setFormData({...formData,role:'candidate'})} aria-pressed={formData.role==='candidate'} className={`rounded-xl border p-3 text-left transition ${formData.role==='candidate'?'border-violet-400 bg-violet-50 ring-2 ring-violet-100':'border-slate-200 bg-white hover:border-violet-200'}`}><span className="block text-sm font-bold text-slate-800">Candidate</span><span className="mt-1 block text-xs leading-5 text-slate-500">Find your next role</span></button>
-                <button type="button" onClick={()=>setFormData({...formData,role:'recruiter'})} aria-pressed={formData.role==='recruiter'} className={`rounded-xl border p-3 text-left transition ${formData.role==='recruiter'?'border-violet-400 bg-violet-50 ring-2 ring-violet-100':'border-slate-200 bg-white hover:border-violet-200'}`}><span className="block text-sm font-bold text-slate-800">Recruiter</span><span className="mt-1 block text-xs leading-5 text-slate-500">Build your team</span></button>
-              </div></fieldset>
               <button type="submit" disabled={submitting} className="group flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-violet-600/20 transition hover:-translate-y-0.5 hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60">{submitting?'Creating account…':'Create account'}{!submitting&&<ArrowRight size={17} className="transition group-hover:translate-x-1"/>}</button>
             </form>
             <p className="mt-7 text-center text-sm text-slate-500">Already have an account? <Link to="/login" className="font-bold text-violet-700 hover:text-violet-900">Sign in</Link></p>
