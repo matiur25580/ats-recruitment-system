@@ -55,7 +55,7 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
 export const getJobs = async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const jobs = await Job.find({
-      status: 'Open',
+      status: { $in: ['Open', null] },
       $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: new Date() } }],
     }).populate('recruiter', 'name email').sort({ createdAt: -1 });
     res.json(jobs);
@@ -123,6 +123,7 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
 
 export const getRecruiterJobs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    await Job.updateMany({ recruiter: req.user._id, status: { $exists: false } }, { $set: { status: 'Open' } });
     const jobs = await Job.find({ recruiter: req.user._id }).sort({ createdAt: -1 });
     res.json(jobs);
   } catch (error: unknown) {
