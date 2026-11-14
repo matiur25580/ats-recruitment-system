@@ -152,6 +152,7 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.equal(candidateApps.response.status, 200);
       assert.equal(candidateApps.body.length, 1);
       assert.equal(Object.hasOwn(candidateApps.body[0], 'recruiterNotes'), false);
+      assert.equal(Object.hasOwn(candidateApps.body[0], 'resumePublicId'), false);
 
       const recruiterApps = await request(`/api/applications/${job._id}`, { headers: bearer(recruiterToken) });
       assert.equal(recruiterApps.response.status, 200);
