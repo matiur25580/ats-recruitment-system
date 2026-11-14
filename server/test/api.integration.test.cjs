@@ -103,6 +103,17 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       job = created.body;
       assert.equal(String(job.recruiter), String(recruiter._id));
 
+      const paginatedJobs = await request('/api/jobs?page=1&limit=1&q=Integration&jobType=Full-time');
+      assert.equal(paginatedJobs.response.status, 200);
+      assert.equal(paginatedJobs.body.items.length, 1);
+      assert.equal(paginatedJobs.body.pagination.total, 1);
+      assert.equal(paginatedJobs.body.pagination.page, 1);
+
+      const recruiterJobs = await request('/api/jobs/mine?page=1&limit=1&q=Integration&status=Open', { headers: bearer(recruiterToken) });
+      assert.equal(recruiterJobs.response.status, 200);
+      assert.equal(recruiterJobs.body.items.length, 1);
+      assert.equal(recruiterJobs.body.pagination.total, 1);
+
       const forbiddenEdit = await request(`/api/jobs/${job._id}`, {
         method: 'PUT', headers: bearer(otherRecruiterToken),
         body: JSON.stringify({ title: 'Hijacked', description: 'No', location: 'Remote', salary: 1, jobType: 'Full-time', experienceLevel: 'Entry' }),
@@ -116,7 +127,7 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.equal(closed.body.job.status, 'Closed');
       const publicJobs = await request('/api/jobs');
       assert.equal(publicJobs.response.status, 200);
-      assert.equal(publicJobs.body.some((item) => item._id === job._id), false);
+      assert.equal(publicJobs.body.items.some((item) => item._id === job._id), false);
 
       const closedApplyForm = new FormData();
       closedApplyForm.append('resume', new Blob([Buffer.from('%PDF-1.7 test')], { type: 'application/pdf' }), 'resume.pdf');
@@ -156,7 +167,12 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
 
       const recruiterApps = await request(`/api/applications/${job._id}`, { headers: bearer(recruiterToken) });
       assert.equal(recruiterApps.response.status, 200);
-      assert.equal(recruiterApps.body[0].recruiterNotes[0].note, 'Internal screening note');
+      assert.equal(recruiterApps.body.items[0].recruiterNotes[0].note, 'Internal screening note');
+
+      const filteredApplicants = await request(`/api/applications/${job._id}?page=1&limit=1&q=Integration&status=Pending`, { headers: bearer(recruiterToken) });
+      assert.equal(filteredApplicants.response.status, 200);
+      assert.equal(filteredApplicants.body.items.length, 1);
+      assert.equal(filteredApplicants.body.pagination.total, 1);
 
       const otherRecruiterApps = await request(`/api/applications/${job._id}`, { headers: bearer(otherRecruiterToken) });
       assert.equal(otherRecruiterApps.response.status, 403);
