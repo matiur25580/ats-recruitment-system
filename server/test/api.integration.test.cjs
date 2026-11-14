@@ -192,6 +192,16 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       });
       assert.equal(invalidTransition.response.status, 409);
 
+      const candidateStatusChange = await request(`/api/applications/${application._id}/status`, {
+        method: 'PUT', headers: bearer(candidateToken), body: JSON.stringify({ status: 'Rejected' }),
+      });
+      assert.equal(candidateStatusChange.response.status, 403);
+
+      const invalidNote = await request(`/api/applications/${application._id}/notes`, {
+        method: 'POST', headers: bearer(recruiterToken), body: JSON.stringify({ note: '   ' }),
+      });
+      assert.equal(invalidNote.response.status, 400);
+
       const forbiddenNote = await request(`/api/applications/${application._id}/notes`, {
         method: 'POST', headers: bearer(otherRecruiterToken), body: JSON.stringify({ note: 'Should not be saved' }),
       });
