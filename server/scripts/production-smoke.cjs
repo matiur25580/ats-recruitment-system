@@ -2,7 +2,7 @@ const cloudinary = require('../dist/config/cloudinary').default;
 const { analyzeResumeWithAI } = require('../dist/utils/aiService');
 const { sendEmail } = require('../dist/utils/mailer');
 
-const required = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET', 'GEMINI_API_KEY', 'EMAIL_USER', 'EMAIL_PASS', 'SMOKE_TEST_EMAIL'];
+const required = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET', 'GEMINI_API_KEY', 'EMAIL_USER', 'EMAIL_PASS', 'SMOKE_TEST_EMAIL', 'SMOKE_API_URL', 'SMOKE_FRONTEND_URL'];
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length) {
   process.stderr.write(`Missing required production smoke secrets: ${missing.join(', ')}\n`);
