@@ -5,6 +5,12 @@ const User = require('../dist/models/User').default;
 const Job = require('../dist/models/Job').default;
 const Application = require('../dist/models/Application').default;
 const AuditLog = require('../dist/models/AuditLog').default;
+const cloudinary = require('../dist/config/cloudinary').default;
+
+// Deterministic Cloudinary SDK contract stub: the application route, validation, persistence and URL signing are exercised without external credentials.
+cloudinary.uploader.upload_stream = (_options, callback) => ({ end: (buffer) => callback(null, { public_id: 'integration/private-resume' }) });
+cloudinary.uploader.destroy = async () => ({ result: 'ok' });
+cloudinary.utils.private_download_url = () => 'https://download.example.test/signed-resume';
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret-at-least-32-characters';
 process.env.CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'test-cloud';
@@ -144,14 +150,18 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       });
       assert.equal(reopened.response.status, 200);
 
-      application = await Application.create({
-        job: job._id,
-        candidate: candidate._id,
-        status: 'Pending',
-        resumePublicId: 'integration/private-resume',
-        statusHistory: [{ status: 'Pending', changedBy: candidate._id, changedAt: new Date() }],
-        recruiterNotes: [{ author: recruiter._id, note: 'Internal screening note', createdAt: new Date() }],
+      const applicationForm = new FormData();
+      applicationForm.append('resume', new Blob([Buffer.from('%PDF-1.7 test resume')], { type: 'application/pdf' }), 'resume.pdf');
+      applicationForm.append('coverLetter', 'Integration test cover letter');
+      const submitted = await request(`/api/applications/${job._id}`, {
+        method: 'POST', headers: bearer(candidateToken), body: applicationForm,
       });
+      assert.equal(submitted.response.status, 201);
+      application = await Application.findById(submitted.body.application._id);
+      assert.equal(application.resumePublicId, 'integration/private-resume');
+      assert.equal(application.aiAnalysisStatus, 'unavailable');
+      application.recruiterNotes.push({ author: recruiter._id, note: 'Internal screening note', createdAt: new Date() });
+      await application.save();
 
       const duplicateForm = new FormData();
       duplicateForm.append('resume', new Blob([Buffer.from('%PDF-1.7 test')], { type: 'application/pdf' }), 'resume.pdf');
@@ -180,7 +190,8 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
 
       const candidateResume = await request(`/api/applications/${application._id}/resume`, { headers: bearer(candidateToken) });
       assert.equal(candidateResume.response.status, 200);
-      assert.ok(candidateResume.body.url);
+      assert.equal(candidateResume.body.url, 'https://download.example.test/signed-resume');
+      assert.ok(candidateResume.body.expiresAt > Math.floor(Date.now() / 1000));
       const unauthorizedResume = await request(`/api/applications/${application._id}/resume`, { headers: bearer(otherRecruiterToken) });
       assert.equal(unauthorizedResume.response.status, 403);
     });
