@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Shared Axios client. A request interceptor attaches the JWT to authenticated API calls.
+ * Interview tip: explain the responsibility of this file and how data flows through it.
+ */
 import axios from 'axios';
 
 const api = axios.create({
@@ -5,6 +9,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
+// Request interceptor: attach the Bearer token centrally instead of repeating it in every API call.
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');

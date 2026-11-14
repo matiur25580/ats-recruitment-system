@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Client route map and lightweight route guard. Client checks improve navigation UX; backend middleware is the security boundary.
+ * Interview tip: explain the responsibility of this file and how data flows through it.
+ */
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
@@ -5,6 +9,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import CandidateProfile from './pages/CandidateProfile';
 
+// Route guard: checks the saved session before rendering pages that require login.
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('token');
   const rawUser = localStorage.getItem('user');

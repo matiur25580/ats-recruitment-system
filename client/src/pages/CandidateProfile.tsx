@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Candidate profile screen: loads and edits profile data, tracks completion, and manages private PDF resume actions.
+ * Interview tip: explain the responsibility of this file and how data flows through it.
+ */
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -29,6 +33,7 @@ const emptyProfile: Profile = {
   skills: [], experience: [], education: [], hasResume: false,
 };
 
+// Page component: owns profile state, API lifecycle, form handlers, and the candidate-facing UI.
 const CandidateProfile = () => {
   const [profile, setProfile] = useState<Profile>(emptyProfile);
   const [skillsText, setSkillsText] = useState('');
@@ -37,6 +42,7 @@ const CandidateProfile = () => {
   const [resumeBusy, setResumeBusy] = useState(false);
   const navigate = useNavigate();
 
+  // On mount, validate the local session and role before requesting private profile data.
   useEffect(() => {
     const stored = localStorage.getItem('user');
     if (!localStorage.getItem('token') || !stored) { navigate('/login', { replace: true }); return; }
@@ -50,6 +56,7 @@ const CandidateProfile = () => {
     void loadProfile();
   }, [navigate]);
 
+  // Fetch the saved profile and normalize optional arrays so the form always receives predictable values.
   const loadProfile = async () => {
     setLoading(true);
     try {
@@ -68,6 +75,7 @@ const CandidateProfile = () => {
     } finally { setLoading(false); }
   };
 
+  // Derived value: calculate how many profile sections have meaningful data.
   const completion = useMemo(() => {
     const checks = [
       Boolean(profile.name.trim()), Boolean(profile.headline.trim()), Boolean(profile.location.trim()),
@@ -79,6 +87,7 @@ const CandidateProfile = () => {
 
   const update = <K extends keyof Profile>(key: K, value: Profile[K]) => setProfile(current => ({ ...current, [key]: value }));
 
+  // Prevent a browser reload, then send only editable profile fields to the backend.
   const handleSave = async (event: FormEvent) => {
     event.preventDefault();
     setSaving(true);
@@ -103,6 +112,7 @@ const CandidateProfile = () => {
     } finally { setSaving(false); }
   };
 
+  // Validate PDF type and size before sending multipart/form-data to the protected API.
   const handleResumeUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -123,6 +133,7 @@ const CandidateProfile = () => {
     } finally { setResumeBusy(false); }
   };
 
+  // Ask the API for a short-lived private URL; do not expose storage IDs in the browser.
   const handleResumeDownload = async () => {
     setResumeBusy(true);
     try {
@@ -137,6 +148,7 @@ const CandidateProfile = () => {
     } finally { setResumeBusy(false); }
   };
 
+  // Require explicit confirmation before deleting the stored resume.
   const handleResumeDelete = async () => {
     if (!window.confirm('Remove your current resume from your profile?')) return;
     setResumeBusy(true);

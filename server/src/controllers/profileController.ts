@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Candidate profile API: validates profile fields and securely manages private PDF resumes.
+ * Interview tip: explain the responsibility of this file and how data flows through it.
+ */
 import { Response } from 'express';
 import User, { IEducation, IExperience } from '../models/User';
 import { AuthRequest } from '../middlewares/authMiddleware';
@@ -51,6 +55,7 @@ const removeResume = async (publicId: string): Promise<void> => {
   await cloudinary.uploader.destroy(publicId, { resource_type: 'raw', type: 'private' });
 };
 
+// Controller: handle this HTTP use case, access only the signed-in candidate's record, and return an HTTP response.
 export const getCandidateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const user = await User.findById(req.user._id).select('-password -resumePublicId');

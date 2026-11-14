@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Express application bootstrap: configures middleware, database connection, API routes, and server startup.
+ * Interview tip: explain the responsibility of this file and how data flows through it.
+ */
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -10,6 +14,7 @@ import profileRoutes from './routes/profileRoutes';
 
 dotenv.config();
 
+// Create the Express app; middleware and routers are registered on this shared instance.
 const app = express();
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
