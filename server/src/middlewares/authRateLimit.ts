@@ -23,6 +23,10 @@ export const authRateLimit = async (req: Request, res: Response, next: NextFunct
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
+    if (!bucket) {
+      throw new Error('Rate-limit counter could not be created');
+    }
+
     if (bucket.count > MAX_REQUESTS) {
       const retryAfter = Math.max(1, Math.ceil((windowStart.getTime() + WINDOW_MS - now) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
