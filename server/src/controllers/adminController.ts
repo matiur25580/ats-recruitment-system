@@ -23,7 +23,7 @@ export const getAdminOverview = async (_req: AuthRequest, res: Response): Promis
     ]);
 
     const statusOrder = ['Pending', 'Reviewed', 'Accepted', 'Rejected'];
-    const statusCounts = new Map<string, number>(statusGroups.map((item: { _id: string; value: number }) => [item._id, item.value]));
+    const statusCounts = new Map<string, number>(statusGroups.map((item: { _id: string; value: number }) => [item._id, item.value] as [string, number]));
 
     res.json({
       totals: { users: totalUsers, candidates: totalCandidates, recruiters: totalRecruiters, jobs: totalJobs, applications: totalApplications },
