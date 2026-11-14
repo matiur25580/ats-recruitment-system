@@ -8,8 +8,10 @@ const AuditLog = require('../dist/models/AuditLog').default;
 const cloudinary = require('../dist/config/cloudinary').default;
 
 // Deterministic Cloudinary SDK contract stub: the application route, validation, persistence and URL signing are exercised without external credentials.
-cloudinary.uploader.upload_stream = (_options, callback) => ({ end: (buffer) => callback(null, { public_id: 'integration/private-resume' }) });
-cloudinary.uploader.destroy = async () => ({ result: 'ok' });
+let cloudinaryUploadCount = 0;
+const destroyedCloudinaryIds = [];
+cloudinary.uploader.upload_stream = (_options, callback) => ({ end: (_buffer) => callback(null, { public_id: `integration/private-resume-${++cloudinaryUploadCount}` }) });
+cloudinary.uploader.destroy = async (publicId) => { destroyedCloudinaryIds.push(publicId); return { result: 'ok' }; };
 cloudinary.utils.private_download_url = () => 'https://download.example.test/signed-resume';
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret-at-least-32-characters';
@@ -158,7 +160,7 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       });
       assert.equal(submitted.response.status, 201);
       application = await Application.findById(submitted.body.application._id);
-      assert.equal(application.resumePublicId, 'integration/private-resume');
+      assert.equal(application.resumePublicId, 'integration/private-resume-1');
       assert.equal(application.aiAnalysisStatus, 'unavailable');
       application.recruiterNotes.push({ author: recruiter._id, note: 'Internal screening note', createdAt: new Date() });
       await application.save();
@@ -240,6 +242,29 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       });
       assert.equal(addedNote.response.status, 201);
       assert.equal(addedNote.body.notes.at(-1).note, 'Interview shortlist');
+    });
+
+    await t.test('candidate profile resume upload, private download and deletion use private storage', async () => {
+      const profileForm = new FormData();
+      profileForm.append('resume', new Blob([Buffer.from('%PDF-1.7 profile resume')], { type: 'application/pdf' }), 'profile-resume.pdf');
+      const uploaded = await request('/api/profile/resume', {
+        method: 'POST', headers: bearer(candidateToken), body: profileForm,
+      });
+      assert.equal(uploaded.response.status, 200);
+      assert.equal(uploaded.body.resumeFileName, 'profile-resume.pdf');
+
+      const profile = await request('/api/profile', { headers: bearer(candidateToken) });
+      assert.equal(profile.response.status, 200);
+      assert.equal(profile.body.hasResume, true);
+      assert.equal(Object.hasOwn(profile.body, 'resumePublicId'), false);
+
+      const download = await request('/api/profile/resume', { headers: bearer(candidateToken) });
+      assert.equal(download.response.status, 200);
+      assert.equal(download.body.url, 'https://download.example.test/signed-resume');
+
+      const deleted = await request('/api/profile/resume', { method: 'DELETE', headers: bearer(candidateToken) });
+      assert.equal(deleted.response.status, 200);
+      assert.ok(destroyedCloudinaryIds.includes('integration/private-resume-2'));
     });
 
     await t.test('admin audit feed is role-protected, paginated and contains safe action metadata', async () => {
