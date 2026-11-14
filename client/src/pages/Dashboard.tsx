@@ -220,6 +220,7 @@ const Dashboard = () => {
     try {
       const response = await api.get(`/applications/${applicationId}/resume`);
       popup.location.href = response.data.url;
+      toast.success('Opening the candidate resume');
     } catch (error: any) {
       popup.close();
       toast.error(error.response?.data?.message || 'Unable to open resume');
