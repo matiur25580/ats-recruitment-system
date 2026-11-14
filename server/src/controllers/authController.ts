@@ -118,7 +118,7 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       await user.save();
 
       const frontendUrl = (process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
-      const resetUrl = `${frontendUrl}/reset-password?token=${encodeURIComponent(rawToken)}`;
+      const resetUrl = `${frontendUrl}/reset-password#token=${encodeURIComponent(rawToken)}`;
       const delivered = await sendEmail(
         user.email,
         'Reset your HireFlow password',
