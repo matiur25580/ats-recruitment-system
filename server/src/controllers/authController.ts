@@ -5,6 +5,7 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
 import generateToken from '../utils/generateToken';
+import { isValidEmail, isValidPassword } from '../utils/validation';
 
 const isDuplicateKeyError = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
@@ -26,7 +27,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    if (password.length < 8) {
+    if (!isValidPassword(password)) {
       res.status(400).json({ message: 'Password must be at least 8 characters long' });
       return;
     }
