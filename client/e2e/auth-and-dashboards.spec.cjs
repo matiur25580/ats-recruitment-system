@@ -6,6 +6,7 @@ const recruiter = { _id: 'recruiter-e2e', name: 'E2E Recruiter', email: 'recruit
 async function mockDashboardApi(page, role) {
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
+    if (route.request().method() === 'POST' && url.pathname.endsWith('/jobs')) return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ _id: 'job-new', title: 'Platform Engineer' }) });
     if (url.pathname.endsWith('/jobs/mine') || url.pathname.endsWith('/jobs')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
         items: role === 'candidate' ? [{ _id: 'job-1', title: 'Frontend Engineer', description: 'Build accessible products', location: 'Remote', salary: 80000, jobType: 'Full-time', status: 'Open' }] : [],
