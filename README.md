@@ -23,7 +23,8 @@ The platform includes **AI-assisted resume-to-job analysis** to provide an addit
 ## Product experience
 
 ### Candidate workspace
-- Secure candidate registration and sign-in.
+- Secure candidate registration and sign-in with duplicate-email checks and clear login feedback.
+- Forgot/reset password flow using hashed, one-time tokens that expire after 30 minutes; password changes revoke existing sessions.
 - Editable professional profile with headline, summary, location and contact details.
 - Skills, work experience and education sections.
 - Profile completion checklist.
@@ -235,6 +236,8 @@ All API paths below are mounted under `/api`.
 |---|---|---|---|
 | POST | `/auth/register` | Public | Register a candidate account |
 | POST | `/auth/login` | Public | Sign in and receive a JWT |
+| POST | `/auth/forgot-password` | Public | Request a one-time password reset email |
+| POST | `/auth/reset-password` | Public | Reset password using an expiring one-time token |
 | GET | `/jobs` | Public | List available job records |
 | POST | `/jobs` | Recruiter | Create a job |
 | POST | `/applications/:jobId` | Candidate | Apply with a PDF resume |
@@ -260,6 +263,8 @@ Authorization: Bearer <your-jwt>
 ## Security and privacy
 
 - Public registration always creates a **candidate** account. The server ignores any role supplied by a public client.
+- Duplicate registration is rejected with a clear login prompt. Login distinguishes unknown email from an incorrect password as requested; this reveals account existence, so production deployments should retain strict rate limits and monitor authentication abuse.
+- Password reset tokens are cryptographically random, stored only as SHA-256 hashes, expire after 30 minutes, are single-use, and increment a session version so previously issued JWTs stop working.
 - Passwords are hashed with bcrypt before they are stored.
 - JWTs are verified by server middleware; the current user is loaded from the database for protected requests.
 - Role middleware restricts candidate and recruiter actions.
@@ -288,7 +293,7 @@ Authorization: Bearer <your-jwt>
 | `npm run build` | Compile TypeScript into `server/dist` |
 | `npm start` | Start the compiled API |
 
-> **Testing status:** automated backend validation and MongoDB-backed API integration tests run in CI. The suite covers role restrictions, job ownership, application workflows, candidate/recruiter resume access, private Cloudinary SDK contract behavior, admin audit access and email retry behavior. External Cloudinary, SMTP and Gemini services are stubbed or omitted in CI; configure real credentials and run a deployment smoke test before production use.
+> **Testing status:** automated backend validation and MongoDB-backed API integration tests run in CI. The suite covers role restrictions, duplicate/unknown-email feedback, password recovery and session revocation, job ownership, application workflows, candidate/recruiter resume access, private Cloudinary SDK contract behavior, admin audit access and email retry behavior. External Cloudinary, SMTP and Gemini services are stubbed or omitted in CI; configure real credentials and run a deployment smoke test before production use.
 
 ## Search, pagination and auditability
 
@@ -305,7 +310,7 @@ The core candidate/recruiter workflows, job lifecycle, pagination, audit events 
 1. Configure and verify real Cloudinary credentials, signed private downloads and storage retention in the target account.
 2. Configure SMTP credentials and verify sender reputation, delivery, bounce handling and operational alerting.
 3. Configure Gemini credentials and validate extraction/analysis on representative, valid PDF resumes; AI remains advisory.
-4. Add password recovery, email verification, account lifecycle controls and optional MFA.
+4. Add email verification, account lifecycle controls and optional MFA.
 5. Add frontend component/browser E2E coverage and load/performance testing.
 6. Define production backups, monitoring, incident response, privacy retention and compliance policies.
 
