@@ -149,8 +149,15 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     if (!application) { res.status(404).json({ message: 'Application not found' }); return; }
     
     const job = application.job as any;
+    if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
     if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
-    
+
+    // Repeated requests are idempotent: do not create duplicate audit entries or send duplicate emails.
+    if (application.status === status) {
+      res.json({ message: 'Application already has this status', application });
+      return;
+    }
+
     application.status = status;
     application.statusHistory.push({ status, changedBy: req.user._id, changedAt: new Date() });
     await application.save();
