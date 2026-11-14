@@ -117,9 +117,21 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       const publicJobs = await request('/api/jobs');
       assert.equal(publicJobs.response.status, 200);
       assert.equal(publicJobs.body.some((item) => item._id === job._id), false);
+
+      const closedApplyForm = new FormData();
+      closedApplyForm.append('resume', new Blob([Buffer.from('%PDF-1.7 test')], { type: 'application/pdf' }), 'resume.pdf');
+      const closedApply = await request(`/api/applications/${job._id}`, {
+        method: 'POST', headers: bearer(candidateToken), body: closedApplyForm,
+      });
+      assert.equal(closedApply.response.status, 409);
     });
 
     await t.test('recruiter application access, notes privacy and resume authorization are enforced', async () => {
+      const reopened = await request(`/api/jobs/${job._id}/status`, {
+        method: 'PATCH', headers: bearer(recruiterToken), body: JSON.stringify({ status: 'Open' }),
+      });
+      assert.equal(reopened.response.status, 200);
+
       application = await Application.create({
         job: job._id,
         candidate: candidate._id,
@@ -128,6 +140,13 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
         statusHistory: [{ status: 'Pending', changedBy: candidate._id, changedAt: new Date() }],
         recruiterNotes: [{ author: recruiter._id, note: 'Internal screening note', createdAt: new Date() }],
       });
+
+      const duplicateForm = new FormData();
+      duplicateForm.append('resume', new Blob([Buffer.from('%PDF-1.7 test')], { type: 'application/pdf' }), 'resume.pdf');
+      const duplicateApply = await request(`/api/applications/${job._id}`, {
+        method: 'POST', headers: bearer(candidateToken), body: duplicateForm,
+      });
+      assert.equal(duplicateApply.response.status, 400);
 
       const candidateApps = await request('/api/applications/my-applications', { headers: bearer(candidateToken) });
       assert.equal(candidateApps.response.status, 200);
