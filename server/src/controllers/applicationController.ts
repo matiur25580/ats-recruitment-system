@@ -38,6 +38,9 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
 
     const job = await Job.findById(jobId).populate('recruiter', 'email name');
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
+    if (job.status !== 'Open' || (job.expiresAt && job.expiresAt <= new Date())) {
+      res.status(409).json({ message: 'This job is no longer accepting applications' }); return;
+    }
 
     // Check before uploading: a duplicate request should not create an orphaned file.
     const alreadyApplied = await Application.findOne({ job: jobId, candidate: req.user._id });
@@ -143,7 +146,9 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     const job = application.job as any;
     if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
     
+    const previousStatus = application.status;
     application.status = status;
+    application.statusHistory.push({ status, changedBy: req.user._id, changedAt: new Date() });
     await application.save();
 
     // ক্যান্ডিডেটকে ইমেইল পাঠানো
@@ -175,5 +180,28 @@ export const getCandidateApplications = async (req: AuthRequest, res: Response):
     res.json(applications);
   } catch (error: any) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+
+export const addRecruiterNote = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const note = req.body?.note;
+    if (typeof note !== 'string' || !note.trim() || note.trim().length > 2000) {
+      res.status(400).json({ message: 'Note must contain 1 to 2000 characters' }); return;
+    }
+    const application = await Application.findById(req.params.appId);
+    if (!application) { res.status(404).json({ message: 'Application not found' }); return; }
+    const job = await Job.findById(application.job).select('recruiter');
+    if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
+    if (job.recruiter.toString() !== req.user._id.toString()) {
+      res.status(403).json({ message: 'Not authorized to add notes to this application' }); return;
+    }
+    application.recruiterNotes.push({ author: req.user._id, note: note.trim(), createdAt: new Date() });
+    await application.save();
+    res.status(201).json({ message: 'Recruiter note added', notes: application.recruiterNotes });
+  } catch (error: unknown) {
+    console.error('Failed to add recruiter note', error);
+    res.status(500).json({ message: 'Unable to add recruiter note' });
   }
 };
