@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Mongoose User model: account roles, profile subdocuments, password hashing, and password comparison.
+ * Interview tip: explain what data this layer owns and which layer calls it.
+ */
 import mongoose, { Document, Schema } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
@@ -57,6 +61,7 @@ const educationSchema = new Schema<IEducation>({
   description: { type: String, trim: true, maxlength: 1000 },
 }, { _id: true });
 
+// Main account schema: maps the TypeScript user contract to MongoDB fields and validation rules.
 const userSchema: Schema = new Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
@@ -74,6 +79,7 @@ const userSchema: Schema = new Schema(
     skills: { type: [{ type: String, trim: true, maxlength: 60 }], default: [] },
     experience: { type: [experienceSchema], default: [] },
     education: { type: [educationSchema], default: [] },
+    // Hide the private storage identifier from ordinary queries unless a resume operation explicitly selects it.
     resumePublicId: { type: String, select: false },
     resumeFileName: { type: String, maxlength: 255 },
     resumeUploadedAt: { type: Date },
@@ -81,12 +87,14 @@ const userSchema: Schema = new Schema(
   { timestamps: true }
 );
 
+// Lifecycle hook: hash the password only when it changes, so plaintext is never persisted.
 userSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password as string, salt);
 });
 
+// Compare a login attempt against the stored bcrypt hash; never decrypt passwords.
 userSchema.methods.matchPassword = async function (enteredPassword: string) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

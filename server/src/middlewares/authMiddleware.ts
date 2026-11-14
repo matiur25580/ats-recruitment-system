@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: JWT authentication middleware: verifies bearer tokens, reloads the account, and attaches trusted identity to the request.
+ * Interview tip: explain what data this layer owns and which layer calls it.
+ */
 import { Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import User from '../models/User';
@@ -6,6 +10,7 @@ export interface AuthRequest extends Request {
   user?: any;
 }
 
+// Authentication gate: verify identity before protected controllers are allowed to run.
 export const protect = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const authorization = req.headers.authorization;
   const match = authorization?.match(/^Bearer\s+(.+)$/i);

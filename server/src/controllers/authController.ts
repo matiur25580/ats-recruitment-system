@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Authentication handlers: validate signup/login data, persist users, compare password hashes, and issue JWTs.
+ * Interview tip: explain what data this layer owns and which layer calls it.
+ */
 import { Request, Response } from 'express';
 import User from '../models/User';
 import generateToken from '../utils/generateToken';
@@ -5,6 +9,7 @@ import generateToken from '../utils/generateToken';
 const isDuplicateKeyError = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
 
+// Registration handler: validate public signup data and create a candidate account safely.
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
   try {
     const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
