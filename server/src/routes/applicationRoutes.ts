@@ -9,7 +9,8 @@ import {
   getJobApplications, 
   updateApplicationStatus,
   getCandidateApplications,
-  getApplicationResume
+  getApplicationResume,
+  addRecruiterNote
 } from '../controllers/applicationController';
 import { protect } from '../middlewares/authMiddleware';
 import { authorizeRoles } from '../middlewares/roleMiddleware';
@@ -36,5 +37,6 @@ router.get('/:jobId', protect, authorizeRoles('recruiter'), getJobApplications);
 
 // ৪. রিক্রুটারের স্ট্যাটাস আপডেট করা
 router.put('/:appId/status', protect, authorizeRoles('recruiter'), updateApplicationStatus);
+router.post('/:appId/notes', protect, authorizeRoles('recruiter'), addRecruiterNote);
 
 export default router;
