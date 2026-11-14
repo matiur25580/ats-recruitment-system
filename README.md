@@ -188,6 +188,7 @@ SMTP_HOST=
 SMTP_PORT=587
 SMTP_SECURE=false
 EMAIL_FROM=
+CLIENT_URL=http://localhost:5173
 ```
 
 Keep real credentials private. Never commit `.env` files, API keys, database URLs or SMTP passwords.
