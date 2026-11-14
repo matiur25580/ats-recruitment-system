@@ -97,7 +97,7 @@ const Dashboard = () => {
         description: formData.description.trim(),
         salary: Number(formData.salary),
         requirements: formData.requirements.split(',').map(item => item.trim()).filter(Boolean),
-        ...(formData.expiresAt ? { expiresAt: new Date(formData.expiresAt).toISOString() } : {}),
+        expiresAt: formData.expiresAt ? new Date(formData.expiresAt).toISOString() : null,
       };
       if (editingJobId) {
         await api.put('/jobs/' + editingJobId, payload);
