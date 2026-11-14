@@ -1,9 +1,14 @@
+/*
+ * LEARNING NOTE: Login form: sends credentials to the API and stores the returned session for subsequent requests.
+ * Interview tip: explain the user action, state change, API request, and feedback shown on this screen.
+ */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, Sparkles } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
+// Login page: collect credentials, ask the backend to verify them, then establish the client session.
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

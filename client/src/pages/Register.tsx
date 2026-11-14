@@ -1,9 +1,14 @@
+/*
+ * LEARNING NOTE: Public candidate signup form. Privileged roles must be assigned only through trusted administrative workflows.
+ * Interview tip: explain the user action, state change, API request, and feedback shown on this screen.
+ */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, BriefcaseBusiness, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, Sparkles, UserRound } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 
+// Public registration intentionally creates candidate accounts only; never trust a role supplied by a browser.
 const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);

@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Global base styles and shared design defaults loaded by the React entry point.
+ * CSS controls presentation only; business rules and authorization belong in TypeScript/backend layers.
+ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

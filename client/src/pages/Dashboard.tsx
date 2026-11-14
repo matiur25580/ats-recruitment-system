@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Role-aware dashboard: presents candidate/recruiter workflows and loads data from protected APIs.
+ * Interview tip: explain the user action, state change, API request, and feedback shown on this screen.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -19,6 +23,7 @@ type Application = { _id: string; job?: any; candidate?: any; coverLetter?: stri
 const initialForm = { title: '', description: '', requirements: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry' };
 const chartColors = ['#64748b', '#8b5cf6', '#10b981', '#f97316'];
 
+// Dashboard page: use the signed-in role to decide which recruitment tools and data should be shown.
 const Dashboard = () => {
   const [user, setUser] = useState<User | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
