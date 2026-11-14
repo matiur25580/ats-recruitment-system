@@ -1,8 +1,13 @@
+/*
+ * LEARNING NOTE: Recruiter dashboard aggregation: totals and average AI match score for jobs owned by the signed-in recruiter.
+ * Interview tip: describe the input, validation, side effects, and failure path.
+ */
 import { Response } from 'express';
 import Job from '../models/Job';
 import Application from '../models/Application';
 import { AuthRequest } from '../middlewares/authMiddleware';
 
+// Scope every query to the authenticated recruiter so dashboard metrics never mix tenants.
 export const getRecruiterStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // ১. রিক্রুটারের সব জব বের করা

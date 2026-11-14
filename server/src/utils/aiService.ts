@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: AI resume analysis helper: extract PDF text, send bounded data to Gemini, validate output, and fail safely.
+ * Interview tip: describe the input, validation, side effects, and failure path.
+ */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 const pdfParse = require('pdf-parse');
@@ -9,6 +13,7 @@ interface ResumeAnalysis {
   aiSummary: string;
 }
 
+// AI is advisory: it summarizes job/resume alignment and must not make a hiring decision.
 export const analyzeResumeWithAI = async (
   pdfBuffer: Buffer,
   jobDescription: string,
@@ -39,6 +44,7 @@ export const analyzeResumeWithAI = async (
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
 
+    // Treat model output as untrusted input and validate its shape before returning it to the controller.
     const parsed: unknown = JSON.parse(responseText);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
       throw new Error('AI response is not a JSON object');
