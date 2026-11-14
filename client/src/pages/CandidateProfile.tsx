@@ -1,9 +1,9 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, BriefcaseBusiness, Check, CheckCircle2, ChevronRight, Download,
-  FileText, GraduationCap, LoaderCircle, MapPin, Plus, Save, Trash2, UploadCloud,
-  UserRound, X,
+  ArrowLeft, BriefcaseBusiness, CheckCircle2, ChevronRight, Download,
+  FileText, GraduationCap, LoaderCircle, Plus, Save, Trash2, UploadCloud,
+  UserRound,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../services/api';
@@ -71,7 +71,7 @@ const CandidateProfile = () => {
   const completion = useMemo(() => {
     const checks = [
       Boolean(profile.name.trim()), Boolean(profile.headline.trim()), Boolean(profile.location.trim()),
-      Boolean(profile.phone.trim()), Boolean(profile.summary.trim()), profile.skills.length > 0,
+      Boolean(profile.phone.trim()), Boolean(profile.summary.trim()), skillsText.split(',').some(skill => skill.trim().length > 0),
       profile.experience.length > 0, profile.education.length > 0, profile.hasResume,
     ];
     return Math.round((checks.filter(Boolean).length / checks.length) * 100);
@@ -232,7 +232,7 @@ const CandidateProfile = () => {
             <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
               <h2 className="font-bold">Profile checklist</h2><p className="mt-1 text-xs text-slate-400">A complete profile helps recruiters understand your fit.</p>
               <div className="mt-4 space-y-3">{[
-                ['Name',Boolean(profile.name.trim())],['Headline',Boolean(profile.headline.trim())],['Location',Boolean(profile.location.trim())],['Phone',Boolean(profile.phone.trim())],['Summary',Boolean(profile.summary.trim())],['Skills',profile.skills.length>0],['Experience',profile.experience.length>0],['Education',profile.education.length>0],['Resume',profile.hasResume],
+                ['Name',Boolean(profile.name.trim())],['Headline',Boolean(profile.headline.trim())],['Location',Boolean(profile.location.trim())],['Phone',Boolean(profile.phone.trim())],['Summary',Boolean(profile.summary.trim())],['Skills',skillsText.split(',').some(skill=>skill.trim().length>0)],['Experience',profile.experience.length>0],['Education',profile.education.length>0],['Resume',profile.hasResume],
               ].map(([label,done])=><div key={String(label)} className="flex items-center justify-between text-sm"><span className={done?'text-slate-700':'text-slate-400'}>{label}</span>{done?<CheckCircle2 size={16} className="text-emerald-500"/>:<span className="h-4 w-4 rounded-full border border-slate-300"/>}</div>)}</div>
             </section>
 
