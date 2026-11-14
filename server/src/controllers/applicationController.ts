@@ -140,16 +140,16 @@ export const getJobApplications = async (req: AuthRequest, res: Response): Promi
     const filter: Record<string, unknown> = { job: jobId };
     if (['Pending', 'Reviewed', 'Accepted', 'Rejected'].includes(status)) filter.status = status;
     if (q) {
+      const slash = String.fromCharCode(92);
+      const special = '.+*?^$()[]{}|' + slash;
+      const safeQuery = q.split('').map((character) => special.includes(character) ? slash + character : character).join('');
       const candidates = await User.find({ $or: [
-        { name: { $regex: q.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
-    res.json(applications);'), $options: 'i' } },
-        { email: { $regex: q.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
-    res.json(applications);'), $options: 'i' } },
+        { name: { $regex: safeQuery, $options: 'i' } },
+        { email: { $regex: safeQuery, $options: 'i' } },
       ] }).select('_id').limit(100);
       filter.$or = [
         { candidate: { $in: candidates.map((candidate) => candidate._id) } },
-        { coverLetter: { $regex: q.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
-    res.json(applications);'), $options: 'i' } },
+        { coverLetter: { $regex: safeQuery, $options: 'i' } },
       ];
     }
     const [items, total] = await Promise.all([
