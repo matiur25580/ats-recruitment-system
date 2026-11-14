@@ -52,13 +52,48 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
   }
 };
 
-export const getJobs = async (_req: AuthRequest, res: Response): Promise<void> => {
+const pagination = (query: AuthRequest['query']) => {
+  const pageValue = Number(query.page ?? 1);
+  const limitValue = Number(query.limit ?? 12);
+  const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 50) : 12;
+  return { page, limit, skip: (page - 1) * limit };
+};
+
+const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\export const getJobs = async (_req: AuthRequest, res: Response): Promise<void> => {
   try {
     const jobs = await Job.find({
       status: { $in: ['Open', null] },
       $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: new Date() } }],
     }).populate('recruiter', 'name email').sort({ createdAt: -1 });
     res.json(jobs);
+  } catch (error: unknown) {
+    console.error('Failed to retrieve jobs', error);
+    res.status(500).json({ message: 'Unable to retrieve jobs' });
+  }
+};');
+
+export const getJobs = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { page, limit, skip } = pagination(req.query);
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+    const jobType = typeof req.query.jobType === 'string' ? req.query.jobType : '';
+    const experienceLevel = typeof req.query.experienceLevel === 'string' ? req.query.experienceLevel : '';
+    const location = typeof req.query.location === 'string' ? req.query.location.trim().slice(0, 100) : '';
+    const filter: Record<string, unknown> = {
+      status: { $in: ['Open', null] },
+      $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+    };
+    if (q) filter.$and = [{ $or: ['title', 'description', 'requirements'].map((field) => ({ [field]: { $regex: escapeRegex(q), $options: 'i' } })) }];
+    if (jobType && allowedJobTypes.includes(jobType as typeof allowedJobTypes[number])) filter.jobType = jobType;
+    if (experienceLevel && allowedExperienceLevels.includes(experienceLevel as typeof allowedExperienceLevels[number])) filter.experienceLevel = experienceLevel;
+    if (location) filter.location = { $regex: escapeRegex(location), $options: 'i' };
+
+    const [items, total] = await Promise.all([
+      Job.find(filter).populate('recruiter', 'name').sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Job.countDocuments(filter),
+    ]);
+    res.json({ items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error: unknown) {
     console.error('Failed to retrieve jobs', error);
     res.status(500).json({ message: 'Unable to retrieve jobs' });
@@ -129,8 +164,17 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
 export const getRecruiterJobs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     await Job.updateMany({ recruiter: req.user._id, status: { $exists: false } }, { $set: { status: 'Open' } });
-    const jobs = await Job.find({ recruiter: req.user._id }).sort({ createdAt: -1 });
-    res.json(jobs);
+    const { page, limit, skip } = pagination(req.query);
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
+    const filter: Record<string, unknown> = { recruiter: req.user._id };
+    if (q) filter.$or = ['title', 'description', 'location'].map((field) => ({ [field]: { $regex: escapeRegex(q), $options: 'i' } }));
+    if (['Open', 'Closed', 'Archived'].includes(status)) filter.status = status;
+    const [items, total] = await Promise.all([
+      Job.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Job.countDocuments(filter),
+    ]);
+    res.json({ items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error: unknown) {
     console.error('Failed to retrieve recruiter jobs', error);
     res.status(500).json({ message: 'Unable to retrieve your jobs' });
