@@ -119,7 +119,13 @@ export const getJobApplications = async (req: AuthRequest, res: Response): Promi
 export const updateApplicationStatus = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { appId } = req.params;
-    const { status } = req.body;
+    const requestedStatus: unknown = req.body?.status;
+    const allowedStatuses = ['Pending', 'Reviewed', 'Accepted', 'Rejected'] as const;
+    if (typeof requestedStatus !== 'string' || !allowedStatuses.includes(requestedStatus as typeof allowedStatuses[number])) {
+      res.status(400).json({ message: 'Invalid application status' });
+      return;
+    }
+    const status = requestedStatus as typeof allowedStatuses[number];
     
     // populate('job') এবং populate('candidate') দুটোই করা হচ্ছে মেইল পাঠানোর জন্য
     const application = await Application.findById(appId).populate('job').populate('candidate', 'email name');
