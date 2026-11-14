@@ -6,11 +6,21 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import CandidateProfile from './pages/CandidateProfile';
 import AdminDashboard from './pages/AdminDashboard';
 
 // Route guard: checks the saved session before rendering pages that require login.
+const getStoredRole = (): string => {
+  try {
+    return JSON.parse(localStorage.getItem('user') || '{}')?.role || '';
+  } catch {
+    return '';
+  }
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('token');
   const rawUser = localStorage.getItem('user');
@@ -44,6 +54,8 @@ function App() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="/profile"
           element={
@@ -56,7 +68,7 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              {JSON.parse(localStorage.getItem('user') || '{}').role === 'admin' ? <AdminDashboard /> : <Dashboard />}
+              {getStoredRole() === 'admin' ? <AdminDashboard /> : <Dashboard />}
             </ProtectedRoute>
           }
         />

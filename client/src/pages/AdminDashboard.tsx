@@ -30,6 +30,7 @@ const AdminDashboard = () => {
     try {
       const response = await api.get('/admin/overview');
       setOverview(response.data);
+      if (quiet) toast.success('Platform overview refreshed');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unable to load platform overview');
     } finally {

@@ -5,11 +5,13 @@
 import { Response } from 'express';
 import Application from '../models/Application';
 import Job from '../models/Job';
+import User from '../models/User';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import cloudinary from '../config/cloudinary';
 import { analyzeResumeWithAI } from '../utils/aiService';
 import { sendEmail } from '../utils/mailer'; // ইমেইল ফাংশন ইম্পোর্ট
 import { isValidPdfBuffer } from '../utils/validation';
+import { recordAuditEvent } from '../utils/audit';
 
 const uploadToCloudinary = (fileBuffer: Buffer): Promise<{ public_id: string }> => {
   return new Promise((resolve, reject) => {
@@ -30,7 +32,11 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
   let uploadedPublicId: string | undefined;
   try {
     const { jobId } = req.params;
-    const coverLetter = req.body?.coverLetter || '';
+    const coverLetter = req.body?.coverLetter ?? '';
+    if (typeof coverLetter !== 'string' || coverLetter.length > 5000) {
+      res.status(400).json({ message: 'Cover letter must be 5000 characters or fewer' });
+      return;
+    }
     if (!req.file || req.file.mimetype !== 'application/pdf' || !isValidPdfBuffer(req.file.buffer)) {
       res.status(400).json({ message: 'Please upload a valid PDF resume' });
       return;
@@ -62,6 +68,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
 
     await application.save();
     uploadedPublicId = undefined;
+    await recordAuditEvent({ actorId: req.user._id, action: 'application.submitted', entityType: 'Application', entityId: application._id, metadata: { jobId: job._id }, requestId: req.header('x-request-id') });
 
     // রিক্রুটারকে ইমেইল পাঠানো
     const recruiter = job.recruiter as any;
@@ -81,6 +88,10 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
       } catch (cleanupError) {
         console.error('Failed to remove an unclaimed resume upload', cleanupError);
       }
+    }
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
+      res.status(409).json({ message: 'You have already applied to this job' });
+      return;
     }
     console.error('Failed to submit application', error);
     res.status(500).json({ message: 'Unable to submit application' });
@@ -122,10 +133,35 @@ export const getJobApplications = async (req: AuthRequest, res: Response): Promi
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
     if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
     
-    const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
-    res.json(applications);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+    const pageValue = Number(req.query.page ?? 1);
+    const limitValue = Number(req.query.limit ?? 10);
+    const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+    const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 50) : 10;
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
+    const filter: Record<string, unknown> = { job: jobId };
+    if (['Pending', 'Reviewed', 'Accepted', 'Rejected'].includes(status)) filter.status = status;
+    if (q) {
+      const slash = String.fromCharCode(92);
+      const special = '.+*?^$()[]{}|' + slash;
+      const safeQuery = q.split('').map((character) => special.includes(character) ? slash + character : character).join('');
+      const candidates = await User.find({ $or: [
+        { name: { $regex: safeQuery, $options: 'i' } },
+        { email: { $regex: safeQuery, $options: 'i' } },
+      ] }).select('_id').limit(100);
+      filter.$or = [
+        { candidate: { $in: candidates.map((candidate) => candidate._id) } },
+        { coverLetter: { $regex: safeQuery, $options: 'i' } },
+      ];
+    }
+    const [items, total] = await Promise.all([
+      Application.find(filter).populate('candidate', 'name email').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
+      Application.countDocuments(filter),
+    ]);
+    res.json({ items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+  } catch (error: unknown) {
+    console.error('Failed to retrieve job applications', error);
+    res.status(500).json({ message: 'Unable to retrieve applications' });
   }
 };
 
@@ -145,11 +181,31 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     if (!application) { res.status(404).json({ message: 'Application not found' }); return; }
     
     const job = application.job as any;
+    if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
     if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
-    
+
+    // Repeated requests are idempotent: do not create duplicate audit entries or send duplicate emails.
+    if (application.status === status) {
+      res.json({ message: 'Application already has this status', application });
+      return;
+    }
+
+    const allowedTransitions: Record<typeof status, readonly string[]> = {
+      Pending: [],
+      Reviewed: ['Pending'],
+      Accepted: ['Pending', 'Reviewed'],
+      Rejected: ['Pending', 'Reviewed'],
+    };
+    if (!allowedTransitions[status].includes(application.status)) {
+      res.status(409).json({ message: `Cannot change application status from ${application.status} to ${status}` });
+      return;
+    }
+
+    const previousStatus = application.status;
     application.status = status;
     application.statusHistory.push({ status, changedBy: req.user._id, changedAt: new Date() });
     await application.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'application.status_changed', entityType: 'Application', entityId: application._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
 
     // ক্যান্ডিডেটকে ইমেইল পাঠানো
     const candidate = application.candidate as any;
@@ -174,12 +230,15 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
 
 export const getCandidateApplications = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    // Recruiter notes are private hiring-team data and must never reach candidate-facing APIs.
     const applications = await Application.find({ candidate: req.user._id })
+      .select('-recruiterNotes -resumePublicId')
       .populate('job', 'title location salary jobType')
       .sort({ createdAt: -1 });
     res.json(applications);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    console.error('Failed to retrieve candidate applications', error);
+    res.status(500).json({ message: 'Unable to retrieve your applications' });
   }
 };
 
@@ -199,6 +258,7 @@ export const addRecruiterNote = async (req: AuthRequest, res: Response): Promise
     }
     application.recruiterNotes.push({ author: req.user._id, note: note.trim(), createdAt: new Date() });
     await application.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'application.note_added', entityType: 'Application', entityId: application._id, metadata: {}, requestId: req.header('x-request-id') });
     res.status(201).json({ message: 'Recruiter note added', notes: application.recruiterNotes });
   } catch (error: unknown) {
     console.error('Failed to add recruiter note', error);

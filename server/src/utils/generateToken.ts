@@ -5,8 +5,8 @@
 import jwt from 'jsonwebtoken';
 
 // Sign only the user ID into a time-limited token; clients send it as a Bearer credential.
-const generateToken = (userId: string) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET as string, {
+const generateToken = (userId: string, tokenVersion = 0) => {
+  return jwt.sign({ id: userId, tokenVersion }, process.env.JWT_SECRET as string, {
     expiresIn: '30d',
   });
 };

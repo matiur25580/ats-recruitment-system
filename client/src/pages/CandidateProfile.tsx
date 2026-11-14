@@ -143,6 +143,7 @@ const CandidateProfile = () => {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.click();
+      toast.success('Opening your resume');
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unable to open resume');
     } finally { setResumeBusy(false); }

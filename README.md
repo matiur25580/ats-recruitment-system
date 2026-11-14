@@ -23,7 +23,8 @@ The platform includes **AI-assisted resume-to-job analysis** to provide an addit
 ## Product experience
 
 ### Candidate workspace
-- Secure candidate registration and sign-in.
+- Secure candidate registration and sign-in with duplicate-email checks and clear login feedback.
+- Forgot/reset password flow using hashed, one-time tokens that expire after 30 minutes; password changes revoke existing sessions.
 - Editable professional profile with headline, summary, location and contact details.
 - Skills, work experience and education sections.
 - Profile completion checklist.
@@ -46,15 +47,6 @@ The platform includes **AI-assisted resume-to-job analysis** to provide an addit
 
 > **Responsible hiring:** AI match scores are decision-support signals, not objective measures of candidate quality. Recruiters must review applications themselves and should never rely on an AI score as the sole hiring criterion.
 
-## Screens and design
-
-The interface uses a responsive SaaS workspace layout with:
-- A focused sign-in and candidate registration experience.
-- A role-aware dashboard with metrics, charts and job cards.
-- A candidate profile editor with completion progress and resume controls.
-- Responsive navigation and layouts for smaller screens.
-- Accessible form labels, keyboard focus states and feedback messages.
-
 ## Technology stack
 
 | Layer | Technologies |
@@ -69,8 +61,8 @@ The interface uses a responsive SaaS workspace layout with:
 | Database | MongoDB, Mongoose |
 | Authentication | JSON Web Tokens (JWT), bcryptjs |
 | Resume storage | Cloudinary private raw resources |
-| AI analysis | Google Gemini API, pdf-parse |
-| Email | Nodemailer (Gmail SMTP configuration) |
+| AI analysis | Google Gemini API, pdf-parse v2 |
+| Email | Nodemailer (configurable SMTP with bounded retry) |
 | CI | GitHub Actions |
 
 ## Architecture
@@ -110,7 +102,7 @@ Express REST API
 │       ├── config/         # Cloudinary configuration
 │       ├── controllers/    # API business logic
 │       ├── middlewares/    # JWT authentication and role checks
-│       ├── models/         # User, Job and Application schemas
+│       ├── models/         # User, Job, Application and AuditLog schemas
 │       ├── routes/         # REST API route definitions
 │       └── utils/          # AI, JWT and email helpers
 ├── docs/
@@ -161,10 +153,17 @@ CLOUDINARY_API_SECRET=
 
 # Optional: AI resume analysis
 GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash-lite
 
-# Optional: email notifications (Gmail app password, not your normal password)
+# Optional: email notifications (SMTP credentials)
 EMAIL_USER=
 EMAIL_PASS=
+# Optional generic SMTP provider (if omitted, Gmail service is used)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
+EMAIL_FROM=
+CLIENT_URL=http://localhost:5173
 ```
 
 Keep real credentials private. Never commit `.env` files, API keys, database URLs or SMTP passwords.
@@ -213,6 +212,8 @@ All API paths below are mounted under `/api`.
 |---|---|---|---|
 | POST | `/auth/register` | Public | Register a candidate account |
 | POST | `/auth/login` | Public | Sign in and receive a JWT |
+| POST | `/auth/forgot-password` | Public | Request a one-time password reset email |
+| POST | `/auth/reset-password` | Public | Reset password using an expiring one-time token |
 | GET | `/jobs` | Public | List available job records |
 | POST | `/jobs` | Recruiter | Create a job |
 | POST | `/applications/:jobId` | Candidate | Apply with a PDF resume |
@@ -226,6 +227,8 @@ All API paths below are mounted under `/api`.
 | GET | `/profile/resume` | Candidate | Get own resume download URL |
 | DELETE | `/profile/resume` | Candidate | Remove own resume |
 | GET | `/stats/recruiter` | Recruiter | Read recruiter dashboard metrics |
+| GET | `/admin/overview` | Admin | Read platform-wide aggregate metrics |
+| GET | `/admin/audit-logs` | Admin | Read paginated, filtered security/activity audit events |
 
 Protected endpoints expect:
 
@@ -236,6 +239,8 @@ Authorization: Bearer <your-jwt>
 ## Security and privacy
 
 - Public registration always creates a **candidate** account. The server ignores any role supplied by a public client.
+- Duplicate registration is rejected with a clear login prompt. Login distinguishes unknown email from an incorrect password as requested; this reveals account existence, so production deployments should retain strict rate limits and monitor authentication abuse.
+- Password reset tokens are cryptographically random, stored only as SHA-256 hashes, expire after 30 minutes, are single-use, and increment a session version so previously issued JWTs stop working.
 - Passwords are hashed with bcrypt before they are stored.
 - JWTs are verified by server middleware; the current user is loaded from the database for protected requests.
 - Role middleware restricts candidate and recruiter actions.
@@ -255,6 +260,7 @@ Authorization: Bearer <your-jwt>
 | `npm run build` | Build the production frontend |
 | `npm run lint` | Run Oxlint |
 | `npm run preview` | Preview the production build locally |
+| `npx playwright test` | Run desktop/mobile browser E2E tests (install `@playwright/test` and Chromium first) |
 
 ### Backend (`server`)
 
@@ -264,22 +270,50 @@ Authorization: Bearer <your-jwt>
 | `npm run build` | Compile TypeScript into `server/dist` |
 | `npm start` | Start the compiled API |
 
-> **Testing status:** the backend `test` script is currently a placeholder and no automated backend test suite is configured yet. The CI workflow currently installs dependencies, compiles the backend, lints the frontend and builds the frontend. A passing CI build is not the same as a full end-to-end test against a live MongoDB/Cloudinary/Gemini environment.
+ > **Testing status:** backend validation and MongoDB-backed API integration tests run in CI, alongside Playwright browser checks for login, registration, password recovery and candidate/recruiter dashboards on desktop and mobile viewports. Cloudinary, SMTP and Gemini provider calls are deliberately not faked as live checks in normal CI; use the manual production smoke workflow below with real secrets before deployment.
 
-## Current limitations and next improvements
+## Search, pagination and auditability
 
-The current implementation provides the core candidate and recruiter journey. A deeper product audit identified these valuable next steps:
+- Public jobs and recruiter-owned jobs use server-side pagination and search. Public filters include job type, experience level and location; recruiter listings support job status.
+- Recruiter applicant lists support pagination, candidate name/email or cover-letter search, and application status filtering.
+- Admins can view a paginated audit feed at `GET /api/admin/audit-logs`, with optional `action` and `entityType` filters.
+- Audit events record job creation/updates/status changes, application submissions/status changes and recruiter notes. They store safe metadata only—not resume bytes, credentials or request bodies.
+- SMTP can use Gmail via `EMAIL_USER` / `EMAIL_PASS`, or a generic provider via `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` and the same credentials. Delivery retries once; notification failure does not roll back a saved application or status.
 
-1. **Automated tests** — backend unit/integration tests, API authorization tests and frontend component tests.
-2. **Password recovery and email verification** — secure, expiring, single-use tokens and account verification.
-3. **Job lifecycle management** — edit, close/reopen, archive and expiry dates for job posts.
-4. **Job search upgrades** — server-side filters, sorting, pagination and location/experience filters.
-5. **Application timeline** — audit history of status changes, timestamps and recruiter notes.
-6. **Recruiter/admin separation** — a dedicated admin experience for managing recruiter accounts and platform-level metrics.
-7. **Candidate engagement** — saved jobs, application withdrawal and notification preferences.
-8. **Production hardening** — rate limiting, structured request logging, centralized error handling, security headers and stronger observability.
+## Production integration verification
 
-These are proposed improvements, not features currently claimed as implemented.
+The `Production integration smoke test` workflow is configured for manual dispatch. It uploads a temporary private PDF to Cloudinary, downloads it through a signed URL, sends that PDF through Gemini analysis, sends one test email through the configured SMTP provider, and checks the deployed API and frontend HTTP endpoints. The temporary Cloudinary object is deleted after the run. GitHub exposes manual dispatch after the workflow file exists on the repository's default branch; until this feature branch is merged, run the same script directly from `server/` after `npm ci` and `npm run build`.
+
+Before running it, create a GitHub Actions environment named `production-smoke` and configure:
+
+**Environment secrets**
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+- `GEMINI_API_KEY`
+- `EMAIL_USER`
+- `EMAIL_PASS`
+- `SMOKE_TEST_EMAIL` — a mailbox you control; the workflow sends one test message here.
+
+**Environment variables**
+- `SMOKE_API_URL` — deployed API origin, e.g. `https://api.example.com` (the workflow checks `/health`).
+- `SMOKE_FRONTEND_URL` — deployed frontend origin.
+- `GEMINI_MODEL` — optional model override; defaults to `gemini-3.5-flash-lite`.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `EMAIL_FROM` — optional generic SMTP configuration; omit `SMTP_HOST` to use Gmail service configuration.
+
+The smoke workflow intentionally requires real provider credentials and is manual to prevent accidental email sends or provider charges on every push. A successful SMTP handoff does not prove inbox placement or bounce handling; inspect the destination inbox and provider delivery logs as well.
+
+## Remaining production-readiness work
+
+The core candidate/recruiter workflows, job lifecycle, pagination, audit events, backend integration tests and desktop/mobile browser checks are implemented. Before treating this as a production deployment, these environment-specific items still require owner action or further validation:
+
+1. Run the production integration smoke workflow with real Cloudinary, SMTP and Gemini credentials, then inspect the received email and provider logs.
+2. Verify deployment-specific HTTPS, exact `CORS_ORIGIN`, `VITE_API_URL`, secure environment secrets and database connectivity.
+3. Run load/performance testing against production-like infrastructure and validate MongoDB backup/restore.
+4. Define monitoring, incident response, privacy retention and applicable compliance policies.
+5. Add email verification, account lifecycle controls and optional MFA.
+
+A green CI run proves the checked-in code builds and the automated tests pass; only a successful smoke run proves the configured external integrations answered the tested requests. Neither certifies legal/compliance readiness.
 
 ## Learning and interview preparation
 
@@ -310,3 +344,61 @@ Before opening a pull request:
 ## License
 
 No license file is currently included. Contact the repository owner before redistributing or reusing this project.
+
+---
+
+## Product dashboard gallery
+
+A laptop-format, single-column tour of the HireFlow candidate and recruiter workspaces. These are **illustrative interface concepts** for the documented product workflows—not captured production screenshots. The labels identify the primary application layer represented in each view.
+
+### Candidate workspace — 6 screens
+
+**01 · Candidate dashboard** — Frontend · Candidate portal
+
+<img src="docs/images/dashboard-01.svg" alt="HireFlow candidate dashboard overview, frontend" width="100%" />
+
+**02 · Explore jobs** — Frontend · Job discovery and filters
+
+<img src="docs/images/dashboard-02.svg" alt="HireFlow candidate job discovery dashboard, frontend" width="100%" />
+
+**03 · My applications** — Frontend · Application tracking
+
+<img src="docs/images/dashboard-03.svg" alt="HireFlow candidate applications dashboard, frontend" width="100%" />
+
+**04 · Candidate profile** — Frontend · Profile and resume management
+
+<img src="docs/images/dashboard-04.svg" alt="HireFlow candidate profile dashboard, frontend" width="100%" />
+
+**05 · AI resume insights** — Backend + Frontend · Gemini analysis and results presentation
+
+<img src="docs/images/dashboard-05.svg" alt="HireFlow AI resume insights dashboard, backend and frontend" width="100%" />
+
+**06 · Application details** — Frontend + API · Application timeline and status
+
+<img src="docs/images/dashboard-06.svg" alt="HireFlow candidate application details, frontend and API" width="100%" />
+
+### Recruiter workspace — 6 screens
+
+**07 · Hiring overview** — Frontend · Recruitment metrics and funnel
+
+<img src="docs/images/dashboard-07.svg" alt="HireFlow recruiter hiring overview dashboard, frontend" width="100%" />
+
+**08 · Job management** — Frontend + Backend · Job publishing and lifecycle
+
+<img src="docs/images/dashboard-08.svg" alt="HireFlow recruiter job management dashboard, frontend and backend" width="100%" />
+
+**09 · Applicant pipeline** — Frontend + API · Applicant search and filtering
+
+<img src="docs/images/dashboard-09.svg" alt="HireFlow recruiter applicant pipeline, frontend and API" width="100%" />
+
+**10 · Candidate review** — Frontend · Candidate profile and resume review
+
+<img src="docs/images/dashboard-10.svg" alt="HireFlow recruiter candidate review dashboard, frontend" width="100%" />
+
+**11 · Application review** — Frontend + Backend · Status changes and recruiter notes
+
+<img src="docs/images/dashboard-11.svg" alt="HireFlow recruiter application review, frontend and backend" width="100%" />
+
+**12 · Recruitment analytics** — Frontend + API · Hiring performance insights
+
+<img src="docs/images/dashboard-12.svg" alt="HireFlow recruiter recruitment analytics dashboard, frontend and API" width="100%" />

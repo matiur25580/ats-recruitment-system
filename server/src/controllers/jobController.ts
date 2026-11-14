@@ -5,6 +5,7 @@
 import { Response } from 'express';
 import Job from '../models/Job';
 import { AuthRequest } from '../middlewares/authMiddleware';
+import { recordAuditEvent } from '../utils/audit';
 
 const allowedJobTypes = ['Full-time', 'Part-time', 'Contract', 'Internship'] as const;
 const allowedExperienceLevels = ['Entry', 'Mid', 'Senior'] as const;
@@ -45,6 +46,7 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
       ...(expiresAt ? { expiresAt } : {}),
       recruiter: req.user._id,
     });
+    await recordAuditEvent({ actorId: req.user._id, action: 'job.created', entityType: 'Job', entityId: createdJob._id, metadata: { status: createdJob.status }, requestId: req.header('x-request-id') });
     res.status(201).json(createdJob);
   } catch (error: unknown) {
     console.error('Failed to create job', error);
@@ -52,13 +54,41 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
   }
 };
 
-export const getJobs = async (_req: AuthRequest, res: Response): Promise<void> => {
+const pagination = (query: AuthRequest['query']) => {
+  const pageValue = Number(query.page ?? 1);
+  const limitValue = Number(query.limit ?? 12);
+  const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const limit = Number.isInteger(limitValue) && limitValue > 0 ? Math.min(limitValue, 50) : 12;
+  return { page, limit, skip: (page - 1) * limit };
+};
+
+const escapeRegex = (value: string): string => {
+  const slash = String.fromCharCode(92);
+  const special = '.+*?^$()[]{}|' + slash;
+  return value.split('').map((character) => special.includes(character) ? slash + character : character).join('');
+};
+
+export const getJobs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const jobs = await Job.find({
+    const { page, limit, skip } = pagination(req.query);
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+    const jobType = typeof req.query.jobType === 'string' ? req.query.jobType : '';
+    const experienceLevel = typeof req.query.experienceLevel === 'string' ? req.query.experienceLevel : '';
+    const location = typeof req.query.location === 'string' ? req.query.location.trim().slice(0, 100) : '';
+    const filter: Record<string, unknown> = {
       status: { $in: ['Open', null] },
       $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: new Date() } }],
-    }).populate('recruiter', 'name email').sort({ createdAt: -1 });
-    res.json(jobs);
+    };
+    if (q) filter.$and = [{ $or: ['title', 'description', 'requirements'].map((field) => ({ [field]: { $regex: escapeRegex(q), $options: 'i' } })) }];
+    if (jobType && allowedJobTypes.includes(jobType as typeof allowedJobTypes[number])) filter.jobType = jobType;
+    if (experienceLevel && allowedExperienceLevels.includes(experienceLevel as typeof allowedExperienceLevels[number])) filter.experienceLevel = experienceLevel;
+    if (location) filter.location = { $regex: escapeRegex(location), $options: 'i' };
+
+    const [items, total] = await Promise.all([
+      Job.find(filter).populate('recruiter', 'name').sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Job.countDocuments(filter),
+    ]);
+    res.json({ items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error: unknown) {
     console.error('Failed to retrieve jobs', error);
     res.status(500).json({ message: 'Unable to retrieve jobs' });
@@ -79,14 +109,20 @@ export const updateJob = async (req: AuthRequest, res: Response): Promise<void> 
       res.status(400).json({ message: 'Please provide all valid job details' }); return;
     }
     if (req.body.expiresAt !== undefined) {
-      const expiry = new Date(req.body.expiresAt);
-      if (!Number.isFinite(expiry.getTime()) || expiry <= new Date()) {
-        res.status(400).json({ message: 'Job expiry must be a valid future date' }); return;
+      if (req.body.expiresAt === null || req.body.expiresAt === '') {
+        // An explicit null clears a previously configured application deadline.
+        job.expiresAt = undefined;
+      } else {
+        const expiry = new Date(req.body.expiresAt);
+        if (!Number.isFinite(expiry.getTime()) || expiry <= new Date()) {
+          res.status(400).json({ message: 'Job expiry must be a valid future date' }); return;
+        }
+        job.expiresAt = expiry;
       }
-      job.expiresAt = expiry;
     }
     Object.assign(job, normalizedJobDetails(req.body));
     await job.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'job.updated', entityType: 'Job', entityId: job._id, metadata: { status: job.status }, requestId: req.header('x-request-id') });
     res.json(job);
   } catch (error: unknown) {
     console.error('Failed to update job', error);
@@ -111,8 +147,10 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
     if (status === 'Open' && job.expiresAt && job.expiresAt <= new Date()) {
       res.status(409).json({ message: 'Update the expiry date before reopening this job' }); return;
     }
+    const previousStatus = job.status;
     job.status = status;
     await job.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'job.status_changed', entityType: 'Job', entityId: job._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
     res.json({ message: `Job ${status.toLowerCase()} successfully`, job });
   } catch (error: unknown) {
     console.error('Failed to change job lifecycle', error);
@@ -124,8 +162,17 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
 export const getRecruiterJobs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     await Job.updateMany({ recruiter: req.user._id, status: { $exists: false } }, { $set: { status: 'Open' } });
-    const jobs = await Job.find({ recruiter: req.user._id }).sort({ createdAt: -1 });
-    res.json(jobs);
+    const { page, limit, skip } = pagination(req.query);
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
+    const filter: Record<string, unknown> = { recruiter: req.user._id };
+    if (q) filter.$or = ['title', 'description', 'location'].map((field) => ({ [field]: { $regex: escapeRegex(q), $options: 'i' } }));
+    if (['Open', 'Closed', 'Archived'].includes(status)) filter.status = status;
+    const [items, total] = await Promise.all([
+      Job.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Job.countDocuments(filter),
+    ]);
+    res.json({ items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error: unknown) {
     console.error('Failed to retrieve recruiter jobs', error);
     res.status(500).json({ message: 'Unable to retrieve your jobs' });
