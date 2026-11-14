@@ -1,3 +1,6 @@
+/*
+ * LEARNING NOTE: Tailwind scans these source paths to generate only the utility CSS classes used by the frontend.
+ */
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [

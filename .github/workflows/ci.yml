@@ -1,3 +1,4 @@
+# LEARNING NOTE: GitHub Actions CI workflow. Each job installs dependencies and runs checks so broken changes are caught before merging.
 name: CI
 
 on:
