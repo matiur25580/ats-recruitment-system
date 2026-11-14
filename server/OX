@@ -1,6 +1,0 @@
-PORT=5000
-MONGO_URI=mongodb+srv://ats_admin:rubel29081998@shahenshahashaikh.swvjuus.mongodb.net/ats_db?retryWrites=true&w=majority
-JWT_SECRET=vaLmwspnU5Ocl6hbIkY1APYtogLX7LwGPg2uFFElJol
-CLOUDINARY_CLOUD_NAME=dd8yv8bzc
-CLOUDINARY_API_KEY=251538387674112
-CLOUDINARY_API_SECRET=EBO8BbFsLc9qN_BEB5bSc_AsIDs

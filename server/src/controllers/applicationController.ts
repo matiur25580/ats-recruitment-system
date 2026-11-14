@@ -1,32 +1,34 @@
 import { Response } from 'express';
 import Application from '../models/Application';
 import Job from '../models/Job';
-import User from '../models/User';
 import { AuthRequest } from '../middlewares/authMiddleware';
-import { v2 as cloudinary } from 'cloudinary';
+import cloudinary from '../config/cloudinary';
 import { analyzeResumeWithAI } from '../utils/aiService';
 import { sendEmail } from '../utils/mailer'; // ইমেইল ফাংশন ইম্পোর্ট
 
-const uploadToCloudinary = (fileBuffer: Buffer): Promise<any> => {
+const uploadToCloudinary = (fileBuffer: Buffer): Promise<{ public_id: string }> => {
   return new Promise((resolve, reject) => {
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
-    });
     const uploadStream = cloudinary.uploader.upload_stream(
-      { resource_type: 'auto' },
-      (error, result) => { if (error) reject(error); else resolve(result); }
+      { resource_type: 'raw', type: 'private', use_filename: false, unique_filename: true },
+      (error, result) => {
+        if (error) reject(error);
+        else if (!result) reject(new Error('Cloudinary returned no upload result'));
+        else resolve({ public_id: result.public_id });
+      }
     );
     uploadStream.end(fileBuffer);
   });
 };
 
 export const applyForJob = async (req: AuthRequest, res: Response): Promise<void> => {
+  let uploadedPublicId: string | undefined;
   try {
     const { jobId } = req.params;
     const coverLetter = req.body?.coverLetter || '';
-    if (!req.file) { res.status(400).json({ message: 'Please upload a resume file' }); return; }
+    if (!req.file || req.file.mimetype !== 'application/pdf' || req.file.buffer.subarray(0, 5).toString() !== '%PDF-') {
+      res.status(400).json({ message: 'Please upload a valid PDF resume' });
+      return;
+    }
 
     const job = await Job.findById(jobId).populate('recruiter', 'email name');
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
@@ -35,14 +37,19 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
     if (alreadyApplied) { res.status(400).json({ message: 'You have already applied' }); return; }
 
     const result = await uploadToCloudinary(req.file.buffer);
+    uploadedPublicId = result.public_id;
     const aiAnalysis = await analyzeResumeWithAI(req.file.buffer, job.description, job.requirements);
 
     const application = new Application({
       job: jobId, candidate: req.user._id, coverLetter,
-      resumeUrl: result.secure_url, matchScore: aiAnalysis.matchScore, aiSummary: aiAnalysis.aiSummary,
+      resumePublicId: result.public_id,
+      matchScore: aiAnalysis?.matchScore,
+      aiSummary: aiAnalysis?.aiSummary,
+      aiAnalysisStatus: aiAnalysis ? 'completed' : 'unavailable',
     });
 
     await application.save();
+    uploadedPublicId = undefined;
 
     // রিক্রুটারকে ইমেইল পাঠানো
     const recruiter = job.recruiter as any;
@@ -50,13 +57,48 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
       sendEmail(
         recruiter.email,
         `New Application for ${job.title}`,
-        `Hello ${recruiter.name},\n\n${req.user.name} has applied for your job "${job.title}".\nAI Match Score: ${aiAnalysis.matchScore}%\n\nLogin to your dashboard to view the resume.`
+        `Hello ${recruiter.name},\n\n${req.user.name} has applied for your job "${job.title}".\nAI Match Score: ${aiAnalysis ? `${aiAnalysis.matchScore}%` : 'unavailable'}\n\nLogin to your dashboard to view the resume.`
       );
     }
 
     res.status(201).json({ message: 'Application submitted successfully', application });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    if (uploadedPublicId) {
+      try {
+        await cloudinary.uploader.destroy(uploadedPublicId, { resource_type: 'raw', type: 'private' });
+      } catch (cleanupError) {
+        console.error('Failed to remove an unclaimed resume upload', cleanupError);
+      }
+    }
+    console.error('Failed to submit application', error);
+    res.status(500).json({ message: 'Unable to submit application' });
+  }
+};
+
+export const getApplicationResume = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const application = await Application.findById(req.params.appId).select('candidate job resumePublicId');
+    if (!application) { res.status(404).json({ message: 'Application not found' }); return; }
+
+    const job = await Job.findById(application.job).select('recruiter');
+    if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
+
+    const isCandidate = application.candidate.toString() === req.user._id.toString();
+    const isRecruiter = job.recruiter.toString() === req.user._id.toString();
+    if (!isCandidate && !isRecruiter) { res.status(403).json({ message: 'Not authorized' }); return; }
+    if (!application.resumePublicId) { res.status(404).json({ message: 'Resume not available' }); return; }
+
+    const expiresAt = Math.floor(Date.now() / 1000) + 60;
+    const url = cloudinary.utils.private_download_url(application.resumePublicId, 'pdf', {
+      resource_type: 'raw',
+      type: 'private',
+      expires_at: expiresAt,
+      attachment: true,
+    });
+    res.json({ url, expiresAt });
+  } catch (error: unknown) {
+    console.error('Failed to create resume download link', error);
+    res.status(500).json({ message: 'Unable to retrieve resume' });
   }
 };
 

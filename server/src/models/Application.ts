@@ -5,9 +5,10 @@ export interface IApplication extends Document {
   candidate: mongoose.Types.ObjectId;
   status: 'Pending' | 'Reviewed' | 'Accepted' | 'Rejected';
   coverLetter?: string;
-  resumeUrl?: string;
+  resumePublicId?: string;
   matchScore?: number;   // নতুন ফিল্ড
   aiSummary?: string;    // নতুন ফিল্ড
+  aiAnalysisStatus: 'completed' | 'unavailable';
 }
 
 const applicationSchema: Schema = new Schema(
@@ -16,9 +17,10 @@ const applicationSchema: Schema = new Schema(
     candidate: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     status: { type: String, enum: ['Pending', 'Reviewed', 'Accepted', 'Rejected'], default: 'Pending' },
     coverLetter: { type: String },
-    resumeUrl: { type: String },
+    resumePublicId: { type: String },
     matchScore: { type: Number },
     aiSummary: { type: String },
+    aiAnalysisStatus: { type: String, enum: ['completed', 'unavailable'], default: 'unavailable' },
   },
   { timestamps: true }
 );

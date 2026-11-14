@@ -78,6 +78,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     }
   };
 
+  const handleViewResume = async (appId: string) => {
+    const resumeWindow = window.open('about:blank', '_blank');
+    if (!resumeWindow) {
+      setMessage('Allow pop-ups to open the resume.');
+      return;
+    }
+    resumeWindow.opener = null;
+    try {
+      const { data } = await API.get(`/applications/${appId}/resume`);
+      resumeWindow.location.href = data.url;
+    } catch (err: any) {
+      resumeWindow.close();
+      setMessage(err.response?.data?.message || 'Failed to open resume');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-10">
       <nav className="bg-white shadow px-6 py-4 flex justify-between items-center">
@@ -156,7 +172,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
                   <div>
                     <p className="font-semibold text-gray-800">{app.candidate?.name} ({app.candidate?.email})</p>
                     <p className="text-xs text-gray-500">Matched Skills: {app.matchedSkills.join(', ') || 'None'}</p>
-                    <a href={`http://localhost:5000/${app.resumeUrl}`} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline mt-1 inline-block">View Resume PDF</a>
+                    <button type="button" onClick={() => handleViewResume(app._id)} className="text-xs text-blue-600 underline mt-1 inline-block">View Resume PDF</button>
                   </div>
                   <div className="text-right">
                     <span className="text-lg font-bold text-green-600">{app.atsScore}%</span>

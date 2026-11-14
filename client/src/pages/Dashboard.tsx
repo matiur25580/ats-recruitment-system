@@ -123,6 +123,22 @@ const Dashboard = () => {
     } finally { setLoading(false); }
   };
 
+  const handleOpenResume = async (appId: string) => {
+    const resumeWindow = window.open('about:blank', '_blank');
+    if (!resumeWindow) {
+      toast.error('Allow pop-ups to open the resume.');
+      return;
+    }
+    resumeWindow.opener = null;
+    try {
+      const { data } = await api.get(`/applications/${appId}/resume`);
+      resumeWindow.location.href = data.url;
+    } catch (error: any) {
+      resumeWindow.close();
+      toast.error(error.response?.data?.message || 'Failed to open resume');
+    }
+  };
+
   if (!user) return null;
 
   const COLORS = ['#FBBF24', '#10B981', '#EF4444'];
@@ -238,14 +254,17 @@ const Dashboard = () => {
                             <h3 className="font-bold text-lg">{app.candidate?.name}</h3>
                             <p className="text-sm text-gray-600">{app.candidate?.email}</p>
                             <p className="text-sm text-gray-700 italic mt-1">"{app.coverLetter}"</p>
-                            {app.resumeUrl && (
-                              <a href={app.resumeUrl} target="_blank" rel="noreferrer" className="text-blue-600 text-sm underline mt-1 block font-medium">📄 View Resume</a>
+                            {app.resumePublicId && (
+                              <button type="button" onClick={() => handleOpenResume(app._id)} className="text-blue-600 text-sm underline mt-1 block font-medium">View Resume</button>
                             )}
                             {app.matchScore !== undefined && (
                               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md max-w-lg">
                                 <p className="text-sm font-bold text-blue-800">🤖 AI Match Score: {app.matchScore}%</p>
                                 <p className="text-xs text-gray-700 mt-1 italic">"{app.aiSummary}"</p>
                               </div>
+                            )}
+                            {app.aiAnalysisStatus === 'unavailable' && (
+                              <p className="mt-3 text-xs text-gray-600">AI analysis unavailable. Review the resume manually.</p>
                             )}
                             <p className="text-xs mt-3 font-semibold">Status: <span className="text-blue-600">{app.status}</span></p>
                           </div>
@@ -281,8 +300,8 @@ const Dashboard = () => {
                             <div className="space-y-2">
                               <textarea placeholder="Write a short cover letter..." value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows={2} />
                               <div className="bg-white p-2 border rounded-md">
-                                <label className="block text-xs text-gray-500 mb-1">Upload Resume (PDF/Word)</label>
-                                <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => { if (e.target.files) setResumeFile(e.target.files[0]); }} className="text-sm w-full" />
+                                <label className="block text-xs text-gray-500 mb-1">Upload Resume (PDF)</label>
+                                <input type="file" accept="application/pdf,.pdf" onChange={(e) => { if (e.target.files) setResumeFile(e.target.files[0]); }} className="text-sm w-full" />
                               </div>
                               <div className="flex gap-2">
                                 <button onClick={() => handleApplyJob(job._id)} disabled={loading} className="bg-green-600 text-white px-3 py-2 rounded text-sm w-full hover:bg-green-700 transition disabled:bg-green-300">{loading ? 'Analyzing...' : 'Submit'}</button>
