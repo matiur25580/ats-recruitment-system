@@ -7,7 +7,8 @@ import api from '../services/api';
 const ResetPassword = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const token = searchParams.get('token') || '';
+  const fragmentToken = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('token');
+  const token = fragmentToken || searchParams.get('token') || '';
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
