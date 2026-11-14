@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const User = require('../dist/models/User').default;
 const Job = require('../dist/models/Job').default;
 const Application = require('../dist/models/Application').default;
+const AuditLog = require('../dist/models/AuditLog').default;
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'integration-test-secret-at-least-32-characters';
 process.env.CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'test-cloud';
@@ -36,7 +37,7 @@ const bearer = (token) => ({ Authorization: `Bearer ${token}` });
 test('MongoDB-backed API integration: auth, roles, job ownership, applications and private data', async (t) => {
   assert.ok(process.env.MONGO_URI, 'MONGO_URI must point to an isolated test database');
   await mongoose.connect(process.env.MONGO_URI);
-  await Promise.all([User.init(), Job.init(), Application.init()]);
+  await Promise.all([User.init(), Job.init(), Application.init(), AuditLog.init()]);
 
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
@@ -228,6 +229,22 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       });
       assert.equal(addedNote.response.status, 201);
       assert.equal(addedNote.body.notes.at(-1).note, 'Interview shortlist');
+    });
+
+    await t.test('admin audit feed is role-protected, paginated and contains safe action metadata', async () => {
+      const recruiterDenied = await request('/api/admin/audit-logs', { headers: bearer(recruiterToken) });
+      assert.equal(recruiterDenied.response.status, 403);
+
+      const admin = await User.create({ name: 'Platform Admin', email: 'admin.integration@example.test', password: 'StrongPass123!', role: 'admin' });
+      const login = await request('/api/auth/login', {
+        method: 'POST', body: JSON.stringify({ email: admin.email, password: 'StrongPass123!' }),
+      });
+      assert.equal(login.response.status, 200);
+      const auditResponse = await request('/api/admin/audit-logs?page=1&limit=5', { headers: bearer(login.body.token) });
+      assert.equal(auditResponse.response.status, 200);
+      assert.ok(auditResponse.body.pagination.total >= 3);
+      assert.ok(auditResponse.body.items.some((entry) => entry.action === 'application.status_changed'));
+      assert.equal(Object.hasOwn(auditResponse.body.items[0] || {}, 'requestBody'), false);
     });
   } finally {
     await mongoose.connection.dropDatabase();
