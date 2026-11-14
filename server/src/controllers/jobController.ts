@@ -79,11 +79,16 @@ export const updateJob = async (req: AuthRequest, res: Response): Promise<void> 
       res.status(400).json({ message: 'Please provide all valid job details' }); return;
     }
     if (req.body.expiresAt !== undefined) {
-      const expiry = new Date(req.body.expiresAt);
-      if (!Number.isFinite(expiry.getTime()) || expiry <= new Date()) {
-        res.status(400).json({ message: 'Job expiry must be a valid future date' }); return;
+      if (req.body.expiresAt === null || req.body.expiresAt === '') {
+        // An explicit null clears a previously configured application deadline.
+        job.expiresAt = undefined;
+      } else {
+        const expiry = new Date(req.body.expiresAt);
+        if (!Number.isFinite(expiry.getTime()) || expiry <= new Date()) {
+          res.status(400).json({ message: 'Job expiry must be a valid future date' }); return;
+        }
+        job.expiresAt = expiry;
       }
-      job.expiresAt = expiry;
     }
     Object.assign(job, normalizedJobDetails(req.body));
     await job.save();
