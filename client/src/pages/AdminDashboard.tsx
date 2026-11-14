@@ -3,7 +3,7 @@
  * Data is loaded from an admin-only API; this page never exposes private resume files or password data.
  */
 import { useEffect, useState } from 'react';
-import { Activity, BriefcaseBusiness, Users, UserRoundCheck, FileText, LogOut, RefreshCw, ShieldCheck, Sparkles, ArrowUpRight } from 'lucide-react';
+import { Activity, BriefcaseBusiness, Users, UserRoundCheck, FileText, LogOut, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
