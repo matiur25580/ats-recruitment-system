@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Activity, ArrowUpRight, BriefcaseBusiness, CheckCircle2, Clock3, FileText, UserRound,
   LayoutDashboard, LogOut, MapPin, Plus, Search, Send, Sparkles,
-  X, UploadCloud, Eye, Ban, Menu,
+  X, UploadCloud, Eye, Ban, Menu, Pencil, Archive, RefreshCw, MessageSquare, History,
 } from 'lucide-react';
 import {
   Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
@@ -17,10 +17,10 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 
 type User = { _id: string; name: string; email?: string; role: 'candidate' | 'recruiter' | 'admin' };
-type Job = { _id: string; title: string; description: string; location: string; salary: number; jobType: string; experienceLevel?: string; recruiter?: any };
-type Application = { _id: string; job?: any; candidate?: any; coverLetter?: string; status: string; matchScore?: number; aiSummary?: string; aiAnalysisStatus?: string; resumePublicId?: string };
+type Job = { _id: string; title: string; description: string; location: string; salary: number; jobType: string; experienceLevel?: string; recruiter?: any; status?: 'Open' | 'Closed' | 'Archived'; expiresAt?: string };
+type Application = { _id: string; job?: any; candidate?: any; coverLetter?: string; status: string; matchScore?: number; aiSummary?: string; aiAnalysisStatus?: string; resumePublicId?: string; statusHistory?: { status: string; changedBy: string; changedAt: string }[]; recruiterNotes?: { author: string; note: string; createdAt: string }[] };
 
-const initialForm = { title: '', description: '', requirements: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry' };
+const initialForm = { title: '', description: '', requirements: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry', expiresAt: '' };
 const chartColors = ['#64748b', '#8b5cf6', '#10b981', '#f97316'];
 
 // Dashboard page: use the signed-in role to decide which recruitment tools and data should be shown.
@@ -33,6 +33,8 @@ const Dashboard = () => {
   const [pageLoading, setPageLoading] = useState(true);
   const [formData, setFormData] = useState(initialForm);
   const [showJobForm, setShowJobForm] = useState(false);
+  const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [selectedJobApplicants, setSelectedJobApplicants] = useState<Application[] | null>(null);
   const [activeJobTitle, setActiveJobTitle] = useState('');
   const [applyJobId, setApplyJobId] = useState<string | null>(null);
@@ -61,12 +63,10 @@ const Dashboard = () => {
   const loadDashboard = async (current: User) => {
     setPageLoading(true);
     try {
-      const jobsRequest = api.get('/jobs');
+      const jobsRequest = api.get(current.role === 'recruiter' ? '/jobs/mine' : '/jobs');
       const jobsResponse = await jobsRequest;
       const allJobs = Array.isArray(jobsResponse.data) ? jobsResponse.data : [];
-      setJobs(current.role === 'recruiter'
-        ? allJobs.filter((job: Job) => (job.recruiter?._id || job.recruiter) === current._id)
-        : allJobs);
+      setJobs(allJobs);
       if (current.role === 'candidate') {
         const response = await api.get('/applications/my-applications');
         setMyApplications(Array.isArray(response.data) ? response.data : []);
@@ -97,10 +97,16 @@ const Dashboard = () => {
         description: formData.description.trim(),
         salary: Number(formData.salary),
         requirements: formData.requirements.split(',').map(item => item.trim()).filter(Boolean),
+        ...(formData.expiresAt ? { expiresAt: new Date(formData.expiresAt).toISOString() } : {}),
       };
-      await api.post('/jobs', payload);
-      toast.success('Your job is now live');
-      setFormData(initialForm); setShowJobForm(false);
+      if (editingJobId) {
+        await api.put('/jobs/' + editingJobId, payload);
+        toast.success('Job details updated');
+      } else {
+        await api.post('/jobs', payload);
+        toast.success('Your job is now live');
+      }
+      setFormData(initialForm); setEditingJobId(null); setShowJobForm(false);
       if (user) await loadDashboard(user);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unable to publish job');
@@ -126,6 +132,39 @@ const Dashboard = () => {
       if (job) await handleViewApplicants(job);
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Unable to update application');
+    }
+  };
+
+
+  const handleEditJob = (job: Job) => {
+    setEditingJobId(job._id);
+    setFormData({ title: job.title, description: job.description, requirements: '', location: job.location, salary: String(job.salary), jobType: job.jobType, experienceLevel: job.experienceLevel || 'Entry', expiresAt: job.expiresAt ? new Date(job.expiresAt).toISOString().slice(0, 10) : '' });
+    setShowJobForm(true);
+  };
+
+  const handleJobLifecycle = async (job: Job, status: 'Open' | 'Closed' | 'Archived') => {
+    const verb = status === 'Archived' ? 'archive' : status === 'Closed' ? 'close' : 'reopen';
+    if (!window.confirm(`Are you sure you want to ${verb} “${job.title}”?`)) return;
+    try {
+      await api.patch(`/jobs/${job._id}/status`, { status });
+      toast.success(`Job ${status.toLowerCase()}`);
+      if (user) await loadDashboard(user);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Unable to update job');
+    }
+  };
+
+  const handleAddNote = async (applicationId: string) => {
+    const note = (noteDrafts[applicationId] || '').trim();
+    if (!note) return;
+    try {
+      await api.post(`/applications/${applicationId}/notes`, { note });
+      toast.success('Private recruiter note added');
+      setNoteDrafts(current => ({ ...current, [applicationId]: '' }));
+      const job = jobs.find(item => item.title === activeJobTitle);
+      if (job) await handleViewApplicants(job);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Unable to save note');
     }
   };
 
@@ -241,10 +280,10 @@ const Dashboard = () => {
               </div>
               {filteredJobs.length === 0 ? <EmptyState title={searchTerm ? 'No matching jobs' : 'Nothing here yet'} detail={searchTerm ? 'Try another search term.' : isRecruiter ? 'Publish your first role to start receiving applications.' : 'There are no open roles available right now.'}/> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {filteredJobs.map(job=><article key={job._id} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition hover:border-violet-200 hover:bg-white hover:shadow-md sm:p-5">
-                  <div className="flex items-start justify-between gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><BriefcaseBusiness size={19}/></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Active role</span></div>
+                  <div className="flex items-start justify-between gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><BriefcaseBusiness size={19}/></div><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${job.status === 'Archived' ? 'bg-slate-100 text-slate-600' : job.status === 'Closed' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{job.status || 'Open'}</span></div>
                   <h4 className="mt-3 text-base font-bold">{job.title}</h4><p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{job.description}</p>
                   <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><MapPin size={13}/>{job.location}</span><span className="inline-flex items-center gap-1"><Clock3 size={13}/>{job.jobType}</span>{job.salary > 0 && <span className="font-semibold text-slate-700">Salary: {job.salary.toLocaleString()}</span>}</div>
-                  <div className="mt-4 border-t border-slate-200/70 pt-3">{isRecruiter ? <button onClick={()=>handleViewApplicants(job)} className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900">View applicants <ArrowUpRight size={15}/></button> : <button onClick={()=>setApplyJobId(job._id)} className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700">Apply for this role <ArrowUpRight size={15} className="ml-1 inline"/></button>}</div>
+                  <div className="mt-4 border-t border-slate-200/70 pt-3">{isRecruiter ? <div className="flex flex-wrap items-center gap-3"><button onClick={()=>handleViewApplicants(job)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-700 hover:text-violet-900">Applicants <ArrowUpRight size={15}/></button><button onClick={()=>handleEditJob(job)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-violet-700"><Pencil size={13}/> Edit</button>{job.status === 'Open' ? <button onClick={()=>void handleJobLifecycle(job,'Closed')} className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><Ban size={13}/> Close</button> : job.status === 'Closed' ? <button onClick={()=>void handleJobLifecycle(job,'Open')} className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><RefreshCw size={13}/> Reopen</button> : null}{job.status !== 'Archived' && <button onClick={()=>void handleJobLifecycle(job,'Archived')} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500"><Archive size={13}/> Archive</button>}</div> : <button disabled={job.status !== 'Open'} onClick={()=>setApplyJobId(job._id)} className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">{job.status === 'Open' ? 'Apply for this role' : 'Applications closed'} <ArrowUpRight size={15} className="ml-1 inline"/></button>}</div>
                 </article>)}
               </div>}
             </section>
@@ -256,15 +295,16 @@ const Dashboard = () => {
         </main>
       </div>
 
-      {showJobForm && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"><div className="my-6 w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl sm:p-7"><div className="mb-5 flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-violet-600">Recruiting</p><h3 className="mt-1 text-xl font-bold">Publish a new role</h3><p className="text-sm text-slate-400">Share the details candidates need to apply.</p></div><button onClick={()=>setShowJobForm(false)} className="rounded-xl border border-slate-200 p-2 text-slate-500" aria-label="Close form"><X size={18}/></button></div><form onSubmit={handlePostJob} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {showJobForm && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"><div className="my-6 w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl sm:p-7"><div className="mb-5 flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-violet-600">Recruiting</p><h3 className="mt-1 text-xl font-bold">{editingJobId ? 'Edit job posting' : 'Publish a new role'}</h3><p className="text-sm text-slate-400">Share the details candidates need to apply.</p></div><button onClick={()=>{setShowJobForm(false);setEditingJobId(null);setFormData(initialForm);}} className="rounded-xl border border-slate-200 p-2 text-slate-500" aria-label="Close form"><X size={18}/></button></div><form onSubmit={handlePostJob} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Job title"><input required value={formData.title} onChange={e=>setFormData({...formData,title:e.target.value})} placeholder="e.g. Product Designer" className="field-input"/></Field>
         <Field label="Location"><input required value={formData.location} onChange={e=>setFormData({...formData,location:e.target.value})} placeholder="Remote / City" className="field-input"/></Field>
         <Field label="Salary"><input required min="0" type="number" value={formData.salary} onChange={e=>setFormData({...formData,salary:e.target.value})} placeholder="Annual salary" className="field-input"/></Field>
         <Field label="Job type"><select value={formData.jobType} onChange={e=>setFormData({...formData,jobType:e.target.value})} className="field-input"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option></select></Field>
         <Field label="Experience level"><select value={formData.experienceLevel} onChange={e=>setFormData({...formData,experienceLevel:e.target.value})} className="field-input"><option>Entry</option><option>Mid</option><option>Senior</option></select></Field>
         <Field label="Requirements (comma separated)"><input value={formData.requirements} onChange={e=>setFormData({...formData,requirements:e.target.value})} placeholder="React, TypeScript, UX" className="field-input"/></Field>
+        <Field label="Application deadline (optional)"><input type="date" min={new Date().toISOString().slice(0,10)} value={formData.expiresAt} onChange={e=>setFormData({...formData,expiresAt:e.target.value})} className="field-input"/></Field>
         <div className="sm:col-span-2"><Field label="Job description"><textarea required rows={4} value={formData.description} onChange={e=>setFormData({...formData,description:e.target.value})} placeholder="Describe the role and responsibilities…" className="field-input"/></Field></div>
-        <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={()=>setShowJobForm(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Cancel</button><button disabled={loading} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"><Plus size={15} className="mr-1 inline"/>{loading?'Publishing…':'Publish job'}</button></div>
+        <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={()=>setShowJobForm(false);setEditingJobId(null);setFormData(initialForm);}} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Cancel</button><button disabled={loading} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"><Plus size={15} className="mr-1 inline"/>{loading?(editingJobId?'Saving…':'Publishing…'):(editingJobId?'Save changes':'Publish job')}</button></div>
       </form></div></div>}
 
       {applyJobId && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"><div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-violet-600">Application</p><h3 className="mt-1 text-xl font-bold">Apply for {jobs.find(job=>job._id===applyJobId)?.title}</h3></div><button onClick={()=>setApplyJobId(null)} aria-label="Close application" className="rounded-lg border p-2"><X size={18}/></button></div><p className="mt-2 text-sm text-slate-500">Attach your resume and add a short note to the hiring team.</p><label className="mt-5 block text-sm font-semibold">Cover letter<textarea rows={4} value={coverLetter} onChange={e=>setCoverLetter(e.target.value)} placeholder="Tell the team why you're a good fit…" className="field-input mt-2"/></label><label className="mt-4 block text-sm font-semibold">Resume (PDF)<span className="mt-2 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-violet-300 bg-violet-50/60 p-4 text-sm font-medium text-violet-800"><UploadCloud size={22}/><span className="min-w-0"><span className="block truncate">{resumeFile?.name || 'Choose a resume file'}</span><span className="text-xs font-normal text-violet-500">Select a file from your device</span></span><input type="file" accept="application/pdf,.pdf" onChange={e=>setResumeFile(e.target.files?.[0]||null)} className="sr-only"/></span></label><div className="mt-6 flex justify-end gap-2"><button onClick={()=>setApplyJobId(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button><button disabled={loading} onClick={()=>void handleApply(applyJobId)} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Send size={15} className="mr-1 inline"/>{loading?'Submitting…':'Submit application'}</button></div></div></div>}
