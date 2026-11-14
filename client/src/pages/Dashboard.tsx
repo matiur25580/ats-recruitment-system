@@ -1,358 +1,280 @@
-import { useEffect, useState } from 'react';
+/*
+ * LEARNING NOTE: Role-aware dashboard: presents candidate/recruiter workflows and loads data from protected APIs.
+ * Interview tip: explain the user action, state change, API request, and feedback shown on this screen.
+ */
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Activity, ArrowUpRight, BriefcaseBusiness, CheckCircle2, Clock3, FileText, UserRound,
+  LayoutDashboard, LogOut, MapPin, Plus, Search, Send, Sparkles,
+  X, UploadCloud, Eye, Ban, Menu,
+} from 'lucide-react';
+import {
+  Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
+  Tooltip, XAxis, YAxis,
+} from 'recharts';
+import toast from 'react-hot-toast';
 import api from '../services/api';
-import toast from 'react-hot-toast'; // Toast ইম্পোর্ট
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
+type User = { _id: string; name: string; email?: string; role: 'candidate' | 'recruiter' | 'admin' };
+type Job = { _id: string; title: string; description: string; location: string; salary: number; jobType: string; experienceLevel?: string; recruiter?: any };
+type Application = { _id: string; job?: any; candidate?: any; coverLetter?: string; status: string; matchScore?: number; aiSummary?: string; aiAnalysisStatus?: string; resumePublicId?: string };
+
+const initialForm = { title: '', description: '', requirements: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry' };
+const chartColors = ['#64748b', '#8b5cf6', '#10b981', '#f97316'];
+
+// Dashboard page: use the signed-in role to decide which recruitment tools and data should be shown.
 const Dashboard = () => {
-  const [user, setUser] = useState<any>(null);
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [myApplications, setMyApplications] = useState<any[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [myApplications, setMyApplications] = useState<Application[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-
-  // --- রিক্রুটার স্টেট ---
-  const [formData, setFormData] = useState({ title: '', description: '', requirements: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry' });
-  const [selectedJobApplicants, setSelectedJobApplicants] = useState<any[] | null>(null);
-
-  // --- ক্যান্ডিডেট স্টেট ---
+  const [pageLoading, setPageLoading] = useState(true);
+  const [formData, setFormData] = useState(initialForm);
+  const [showJobForm, setShowJobForm] = useState(false);
+  const [selectedJobApplicants, setSelectedJobApplicants] = useState<Application[] | null>(null);
+  const [activeJobTitle, setActiveJobTitle] = useState('');
   const [applyJobId, setApplyJobId] = useState<string | null>(null);
   const [coverLetter, setCoverLetter] = useState('');
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      fetchJobs(parsedUser);
-      if (parsedUser.role === 'candidate') {
-        fetchMyApplications();
-      } else if (parsedUser.role === 'recruiter') {
-        fetchStats();
+    try {
+      const stored = localStorage.getItem('user');
+      const token = localStorage.getItem('token');
+      if (!stored || !token) { navigate('/login'); return; }
+      const parsed = JSON.parse(stored) as User;
+      if (!parsed?._id || !['candidate', 'recruiter', 'admin'].includes(parsed.role)) {
+        localStorage.removeItem('user'); localStorage.removeItem('token'); navigate('/login'); return;
       }
-    } else { navigate('/login'); }
+      setUser(parsed);
+      void loadDashboard(parsed);
+    } catch {
+      localStorage.removeItem('user'); localStorage.removeItem('token'); navigate('/login');
+    }
   }, [navigate]);
 
-  const fetchJobs = async (currentUser: any) => {
+  const loadDashboard = async (current: User) => {
+    setPageLoading(true);
     try {
-      const res = await api.get('/jobs');
-      if (currentUser.role === 'recruiter') {
-        const myJobs = res.data.filter((job: any) => job.recruiter._id === currentUser._id);
-        setJobs(myJobs);
-      } else { setJobs(res.data); }
-    } catch (error) { console.error('Error fetching jobs', error); }
+      const jobsRequest = api.get('/jobs');
+      const jobsResponse = await jobsRequest;
+      const allJobs = Array.isArray(jobsResponse.data) ? jobsResponse.data : [];
+      setJobs(current.role === 'recruiter'
+        ? allJobs.filter((job: Job) => (job.recruiter?._id || job.recruiter) === current._id)
+        : allJobs);
+      if (current.role === 'candidate') {
+        const response = await api.get('/applications/my-applications');
+        setMyApplications(Array.isArray(response.data) ? response.data : []);
+      }
+      if (current.role === 'recruiter' || current.role === 'admin') {
+        const response = await api.get('/stats/recruiter');
+        setStats(response.data);
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Could not load dashboard data');
+    } finally { setPageLoading(false); }
   };
 
-  const fetchMyApplications = async () => {
-    try {
-      const res = await api.get('/applications/my-applications');
-      setMyApplications(res.data);
-    } catch (error) { console.error('Error fetching my applications', error); }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const res = await api.get('/stats/recruiter');
-      setStats(res.data);
-    } catch (error) { console.error('Error fetching stats', error); }
-  };
+  const filteredJobs = useMemo(() => jobs.filter(job =>
+    `${job.title} ${job.location} ${job.jobType}`.toLowerCase().includes(searchTerm.toLowerCase())
+  ), [jobs, searchTerm]);
 
   const handleLogout = () => {
     localStorage.removeItem('token'); localStorage.removeItem('user'); navigate('/login');
   };
 
-  // --- রিক্রুটার ফাংশন ---
-  const handlePostJob = async (e: React.FormEvent) => {
-    e.preventDefault(); setLoading(true);
+  const handlePostJob = async (event: React.FormEvent) => {
+    event.preventDefault(); setLoading(true);
     try {
-      const jobData = { ...formData, salary: Number(formData.salary), requirements: formData.requirements.split(',').map(req => req.trim()) };
-      await api.post('/jobs', jobData);
-      toast.success('Job posted successfully!');
-      setFormData({ title: '', description: '', requirements: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry' });
-      fetchJobs(user);
-      fetchStats();
-    } catch (error: any) { 
-      toast.error(error.response?.data?.message || 'Failed to post job'); 
+      const payload = {
+        ...formData,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        salary: Number(formData.salary),
+        requirements: formData.requirements.split(',').map(item => item.trim()).filter(Boolean),
+      };
+      await api.post('/jobs', payload);
+      toast.success('Your job is now live');
+      setFormData(initialForm); setShowJobForm(false);
+      if (user) await loadDashboard(user);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Unable to publish job');
     } finally { setLoading(false); }
   };
 
-  const handleViewApplicants = async (jobId: string) => {
-    setLoading(true); setSelectedJobApplicants(null); 
+  const handleViewApplicants = async (job: Job) => {
+    setLoading(true); setSelectedJobApplicants(null); setActiveJobTitle(job.title);
     try {
-      const res = await api.get(`/applications/${jobId}`);
-      setSelectedJobApplicants(res.data);
-    } catch (error: any) { 
-      toast.error(error.response?.data?.message || 'Failed to load applicants'); 
+      const response = await api.get(`/applications/${job._id}`);
+      setSelectedJobApplicants(Array.isArray(response.data) ? response.data : []);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Unable to load applicants');
     } finally { setLoading(false); }
   };
 
-  const handleUpdateStatus = async (appId: string, status: string) => {
+  const handleUpdateStatus = async (applicationId: string, status: string) => {
     try {
-      await api.put(`/applications/${appId}/status`, { status });
-      toast.success(`Application marked as ${status}`);
-      if (selectedJobApplicants && selectedJobApplicants.length > 0) {
-        const jobId = selectedJobApplicants[0].job._id || selectedJobApplicants[0].job;
-        handleViewApplicants(jobId);
-      }
-      fetchStats();
-    } catch (error: any) { 
-      toast.error('Failed to update status'); 
+      await api.put(`/applications/${applicationId}/status`, { status });
+      toast.success(`Application marked ${status.toLowerCase()}`);
+      if (user) await loadDashboard(user);
+      const job = jobs.find(item => item.title === activeJobTitle);
+      if (job) await handleViewApplicants(job);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Unable to update application');
     }
   };
 
-  // --- ক্যান্ডিডেট ফাংশন ---
-  const handleApplyJob = async (jobId: string) => {
-    if (!resumeFile) { 
-      toast.error('Please select a resume file (PDF/Word) to apply.'); 
-      return; 
-    }
+  const handleApply = async (jobId: string) => {
+    if (!resumeFile) { toast.error('Please choose your resume first'); return; }
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('coverLetter', coverLetter);
-      formData.append('resume', resumeFile);
-
-      await api.post(`/applications/${jobId}`, formData);
-      toast.success('Application submitted successfully!');
+      const payload = new FormData();
+      payload.append('coverLetter', coverLetter);
+      payload.append('resume', resumeFile);
+      await api.post(`/applications/${jobId}`, payload);
+      toast.success('Application submitted successfully');
       setApplyJobId(null); setCoverLetter(''); setResumeFile(null);
-      fetchMyApplications();
-    } catch (error: any) { 
-      toast.error(error.response?.data?.message || 'Failed to apply'); 
+      if (user) await loadDashboard(user);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Unable to submit application');
     } finally { setLoading(false); }
   };
 
-  const handleOpenResume = async (appId: string) => {
-    const resumeWindow = window.open('about:blank', '_blank');
-    if (!resumeWindow) {
-      toast.error('Allow pop-ups to open the resume.');
-      return;
-    }
-    resumeWindow.opener = null;
+  const handleOpenResume = async (applicationId: string) => {
+    const popup = window.open('about:blank', '_blank');
+    if (!popup) { toast.error('Please allow pop-ups to view resumes'); return; }
+    popup.opener = null;
     try {
-      const { data } = await api.get(`/applications/${appId}/resume`);
-      resumeWindow.location.href = data.url;
+      const response = await api.get(`/applications/${applicationId}/resume`);
+      popup.location.href = response.data.url;
     } catch (error: any) {
-      resumeWindow.close();
-      toast.error(error.response?.data?.message || 'Failed to open resume');
+      popup.close();
+      toast.error(error.response?.data?.message || 'Unable to open resume');
     }
   };
 
-  if (!user) return null;
+  if (!user || pageLoading) {
+    return <div className="min-h-screen bg-slate-950 grid place-items-center text-slate-300"><div className="flex items-center gap-3"><span className="h-2.5 w-2.5 animate-pulse rounded-full bg-violet-400" /> Loading your workspace…</div></div>;
+  }
 
-  const COLORS = ['#FBBF24', '#10B981', '#EF4444'];
+  const isRecruiter = user.role === 'recruiter' || user.role === 'admin';
+  const statusData = Array.isArray(stats?.statusData) ? stats.statusData : [];
+  const totalApps = Number(stats?.totalApplications ?? myApplications.length);
+  const totalJobs = Number(stats?.totalJobs ?? jobs.length);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 pb-12">
-      <div className="max-w-6xl mx-auto">
-        
-        <div className="bg-white p-6 rounded-lg shadow-md flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold capitalize">{user.role} Dashboard</h1>
-            <p className="text-gray-600">Welcome, {user.name}</p>
+    <div className="min-h-screen bg-[#f5f6fb] text-slate-900">
+      <div className="flex min-h-screen">
+        <aside className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-[#111426] px-5 py-6 text-white transition-transform lg:static lg:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="mb-10 flex items-center gap-3 px-2">
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40"><BriefcaseBusiness size={22} /></div>
+            <div><p className="text-lg font-bold tracking-tight">HireFlow<span className="text-violet-400">.</span></p><p className="text-xs text-slate-400">Talent workspace</p></div>
+            <button className="ml-auto lg:hidden" onClick={() => setMobileNavOpen(false)} aria-label="Close menu"><X size={20}/></button>
           </div>
-          <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition">Logout</button>
-        </div>
-
-        {/* রিক্রুটার অ্যানালিটিক্স */}
-        {user.role === 'recruiter' && stats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="bg-white p-6 rounded-lg shadow-md flex flex-col justify-center items-center border-l-4 border-blue-500">
-              <h3 className="text-gray-500 font-medium mb-2">Total Posted Jobs</h3>
-              <p className="text-4xl font-bold text-blue-600">{stats.totalJobs}</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md flex flex-col justify-center items-center border-l-4 border-purple-500">
-              <h3 className="text-gray-500 font-medium mb-2">Total Applications</h3>
-              <p className="text-4xl font-bold text-purple-600">{stats.totalApplications}</p>
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md flex flex-col justify-center items-center border-l-4 border-green-500">
-              <h3 className="text-gray-500 font-medium mb-2">Avg AI Match Score</h3>
-              <p className="text-4xl font-bold text-green-600">{stats.averageMatchScore}%</p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md md:col-span-2">
-              <h3 className="text-lg font-bold mb-4 text-center">Application Status Breakdown</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={stats.statusData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} fill="#8884d8" paddingAngle={5} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
-                      {stats.statusData.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-lg font-bold mb-4 text-center">Status Overview</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={stats.statusData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" tick={{fontSize: 12}} />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          <p className="px-3 text-[10px] font-bold uppercase tracking-[.2em] text-slate-500">Workspace</p>
+          <nav className="mt-3 space-y-1">
+            <div className="flex items-center gap-3 rounded-xl bg-violet-500/15 px-3 py-3 text-sm font-semibold text-violet-200"><LayoutDashboard size={18}/> Overview</div>
+            <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400"><BriefcaseBusiness size={18}/> {isRecruiter ? 'My job posts' : 'Explore jobs'}</div>
+            <div className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm text-slate-400"><FileText size={18}/> {isRecruiter ? 'Applicants' : 'My applications'}</div>
+            {!isRecruiter && <button onClick={() => navigate('/profile')} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-slate-400 transition hover:bg-white/5 hover:text-white"><UserRound size={18}/> My profile</button>}
+          </nav>
+          <div className="mt-auto rounded-2xl border border-white/10 bg-white/[.04] p-4">
+            <div className="mb-3 flex items-center gap-2 text-violet-300"><Sparkles size={16}/><span className="text-xs font-semibold">AI-assisted hiring</span></div>
+            <p className="text-xs leading-5 text-slate-400">Use match insights as a helpful signal. Keep every hiring decision human-reviewed.</p>
           </div>
-        )}
+          <button onClick={handleLogout} className="mt-5 flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-white"><LogOut size={18}/> Sign out</button>
+        </aside>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* রিক্রুটার ভিউ */}
-          {user.role === 'recruiter' && (
-            <>
-              <div className="bg-white p-6 rounded-lg shadow-md md:col-span-1 h-fit">
-                <h2 className="text-xl font-bold mb-4">Post a New Job</h2>
-                <form onSubmit={handlePostJob} className="space-y-3">
-                  <input type="text" placeholder="Job Title" required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <textarea placeholder="Job Description" required value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" rows={3}></textarea>
-                  <input type="text" placeholder="Requirements (comma separated)" required value={formData.requirements} onChange={(e) => setFormData({...formData, requirements: e.target.value})} className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <div className="flex gap-2">
-                    <input type="text" placeholder="Location" required value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})} className="w-1/2 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" />
-                    <input type="number" placeholder="Salary" required value={formData.salary} onChange={(e) => setFormData({...formData, salary: e.target.value})} className="w-1/2 px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" />
-                  </div>
-                  <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">Post Job</button>
-                </form>
+        {mobileNavOpen && <button aria-label="Close navigation overlay" onClick={() => setMobileNavOpen(false)} className="fixed inset-0 z-30 bg-slate-950/60 lg:hidden"/>}
+
+        <main className="min-w-0 flex-1">
+          <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/85 px-4 py-4 backdrop-blur-xl sm:px-7 lg:px-10">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setMobileNavOpen(true)} className="rounded-xl border border-slate-200 p-2 lg:hidden" aria-label="Open navigation"><Menu size={19}/></button>
+                <div><p className="text-xs font-medium text-slate-400">Workspace / Overview</p><h1 className="mt-0.5 text-lg font-bold tracking-tight sm:text-xl">Dashboard</h1></div>
               </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-md md:col-span-2">
-                <h2 className="text-xl font-bold mb-4">My Posted Jobs</h2>
-                {jobs.length === 0 ? <p className="text-gray-500 text-sm">You haven't posted any jobs yet.</p> : (
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                    {jobs.map((job) => (
-                      <div key={job._id} className="p-4 border rounded-md bg-gray-50 flex justify-between items-center">
-                        <div>
-                          <h3 className="font-bold text-lg">{job.title}</h3>
-                          <p className="text-sm text-gray-600">{job.location} • {job.jobType}</p>
-                        </div>
-                        <button onClick={() => handleViewApplicants(job._id)} className="bg-gray-800 text-white px-3 py-1 rounded text-sm hover:bg-black transition">View Applicants</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="flex items-center gap-3">
+                <div className="hidden text-right sm:block"><p className="text-sm font-semibold">{user.name}</p><p className="text-xs capitalize text-slate-400">{user.role}</p></div>
+                <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">{user.name?.slice(0,1).toUpperCase()}</div>
               </div>
+            </div>
+          </header>
 
-              {selectedJobApplicants !== null && (
-                <div className="md:col-span-3 bg-white p-6 rounded-lg shadow-md border-2 border-blue-200">
-                  <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Applicants List</h2>
-                    <button onClick={() => setSelectedJobApplicants(null)} className="text-red-500 font-bold hover:bg-red-50 px-2 py-1 rounded">✕ Close</button>
-                  </div>
-                  {selectedJobApplicants.length === 0 ? <p className="text-gray-500">No one has applied yet.</p> : (
-                    <div className="space-y-4">
-                      {selectedJobApplicants.map((app: any) => (
-                        <div key={app._id} className="p-4 border rounded-md flex flex-col md:flex-row justify-between bg-gray-50">
-                          <div className="w-full">
-                            <h3 className="font-bold text-lg">{app.candidate?.name}</h3>
-                            <p className="text-sm text-gray-600">{app.candidate?.email}</p>
-                            <p className="text-sm text-gray-700 italic mt-1">"{app.coverLetter}"</p>
-                            {app.resumePublicId && (
-                              <button type="button" onClick={() => handleOpenResume(app._id)} className="text-blue-600 text-sm underline mt-1 block font-medium">View Resume</button>
-                            )}
-                            {app.matchScore !== undefined && (
-                              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md max-w-lg">
-                                <p className="text-sm font-bold text-blue-800">🤖 AI Match Score: {app.matchScore}%</p>
-                                <p className="text-xs text-gray-700 mt-1 italic">"{app.aiSummary}"</p>
-                              </div>
-                            )}
-                            {app.aiAnalysisStatus === 'unavailable' && (
-                              <p className="mt-3 text-xs text-gray-600">AI analysis unavailable. Review the resume manually.</p>
-                            )}
-                            <p className="text-xs mt-3 font-semibold">Status: <span className="text-blue-600">{app.status}</span></p>
-                          </div>
-                          <div className="flex gap-2 mt-4 md:mt-0 w-full md:w-auto justify-end items-end">
-                            <button onClick={() => handleUpdateStatus(app._id, 'Accepted')} className="bg-green-500 text-white px-4 py-2 rounded text-sm hover:bg-green-600 transition h-10">Accept</button>
-                            <button onClick={() => handleUpdateStatus(app._id, 'Rejected')} className="bg-red-500 text-white px-4 py-2 rounded text-sm hover:bg-red-600 transition h-10">Reject</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+          <div className="mx-auto max-w-7xl space-y-7 px-4 py-7 sm:px-7 lg:px-10 lg:py-9">
+            <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#24234b] via-[#38306d] to-[#5141a0] p-6 text-white shadow-xl shadow-indigo-900/10 sm:p-8">
+              <div className="relative z-10 max-w-2xl">
+                <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[.18em] text-violet-200"><Sparkles size={14}/> Your talent workspace</p>
+                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">{isRecruiter ? 'Build your next great team.' : 'Your next opportunity starts here.'}</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-indigo-100/80">Welcome back, {user.name}. {isRecruiter ? 'Manage open roles, review applicants and track your hiring pipeline.' : 'Discover roles that fit your skills and keep every application in one place.'}</p>
+                {isRecruiter && <button onClick={() => setShowJobForm(true)} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-indigo-900 shadow-lg transition hover:-translate-y-0.5"><Plus size={17}/> Post a new job</button>}
+              </div>
+              <div className="pointer-events-none absolute -right-12 -top-24 h-72 w-72 rounded-full border-[36px] border-white/5"/><div className="pointer-events-none absolute -bottom-32 right-32 h-72 w-72 rounded-full bg-violet-400/15 blur-3xl"/>
+            </section>
+
+            <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <Metric icon={<BriefcaseBusiness size={19}/>} label={isRecruiter ? 'Published jobs' : 'Available jobs'} value={isRecruiter ? totalJobs : jobs.length} note="Across your workspace" tint="violet"/>
+              <Metric icon={<FileText size={19}/>} label={isRecruiter ? 'Applications received' : 'Applications sent'} value={totalApps} note="Application activity" tint="blue"/>
+              <Metric icon={<Activity size={19}/>} label={isRecruiter ? 'Average AI match' : 'In review'} value={isRecruiter ? `${stats?.averageMatchScore ?? 0}%` : myApplications.filter(app => app.status === 'Pending' || app.status === 'Reviewed').length} note={isRecruiter ? 'Decision-support signal' : 'Waiting for an update'} tint="green"/>
+            </section>
+
+            {isRecruiter && statusData.length > 0 && <section className="grid grid-cols-1 gap-5 xl:grid-cols-5">
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm xl:col-span-3">
+                <div className="mb-4"><h3 className="font-bold">Hiring pipeline</h3><p className="text-xs text-slate-400">Applications by current status</p></div>
+                <div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={statusData}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef0f6"/><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{fontSize:11,fill:'#94a3b8'}}/><Tooltip cursor={{fill:'#f5f3ff'}}/><Bar dataKey="value" fill="#7664dc" radius={[7,7,0,0]} barSize={34}/></BarChart></ResponsiveContainer></div>
+              </div>
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm xl:col-span-2"><h3 className="font-bold">Status mix</h3><p className="text-xs text-slate-400">Current application distribution</p><div className="h-64"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={58} outerRadius={86} paddingAngle={4}>{statusData.map((item: any,index: number)=><Cell key={item.name} fill={chartColors[index%chartColors.length]}/>)}</Pie><Tooltip/></PieChart></ResponsiveContainer></div></div>
+            </section>}
+
+            <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6">
+              <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div><h3 className="text-lg font-bold">{isRecruiter ? 'Your job postings' : 'Explore opportunities'}</h3><p className="text-sm text-slate-400">{isRecruiter ? 'Keep track of roles and review applicants.' : 'Find a role that matches your experience.'}</p></div>
+                <div className="flex gap-2">
+                  <div className="relative min-w-0 flex-1 sm:w-64"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={searchTerm} onChange={event=>setSearchTerm(event.target.value)} placeholder="Search jobs…" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"/></div>
+                  {isRecruiter && <button onClick={()=>setShowJobForm(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"><Plus size={16}/><span className="hidden sm:inline">New job</span></button>}
                 </div>
-              )}
-            </>
-          )}
-
-          {/* ক্যান্ডিডেট ভিউ */}
-          {user.role === 'candidate' && (
-            <>
-              <div className="md:col-span-2 bg-white p-6 rounded-lg shadow-md">
-                <h2 className="text-xl font-bold mb-4">Available Jobs</h2>
-                {jobs.length === 0 ? <p className="text-gray-500">No jobs available right now.</p> : (
-                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                    {jobs.map((job) => (
-                      <div key={job._id} className="p-4 border rounded-md bg-gray-50 flex flex-col justify-between">
-                        <div>
-                          <h3 className="font-bold text-lg">{job.title}</h3>
-                          <p className="text-sm text-gray-700 mb-2">{job.description}</p>
-                          <p className="text-sm text-gray-600"><strong>Location:</strong> {job.location} | <strong>Salary:</strong> ${job.salary}</p>
-                        </div>
-                        <div className="mt-4 border-t pt-3">
-                          {applyJobId === job._id ? (
-                            <div className="space-y-2">
-                              <textarea placeholder="Write a short cover letter..." value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none" rows={2} />
-                              <div className="bg-white p-2 border rounded-md">
-                                <label className="block text-xs text-gray-500 mb-1">Upload Resume (PDF)</label>
-                                <input type="file" accept="application/pdf,.pdf" onChange={(e) => { if (e.target.files) setResumeFile(e.target.files[0]); }} className="text-sm w-full" />
-                              </div>
-                              <div className="flex gap-2">
-                                <button onClick={() => handleApplyJob(job._id)} disabled={loading} className="bg-green-600 text-white px-3 py-2 rounded text-sm w-full hover:bg-green-700 transition disabled:bg-green-300">{loading ? 'Analyzing...' : 'Submit'}</button>
-                                <button onClick={() => setApplyJobId(null)} className="bg-gray-400 text-white px-3 py-2 rounded text-sm w-full hover:bg-gray-500 transition">Cancel</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <button onClick={() => setApplyJobId(job._id)} className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition">Apply Now</button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
+              {filteredJobs.length === 0 ? <EmptyState title={searchTerm ? 'No matching jobs' : 'Nothing here yet'} detail={searchTerm ? 'Try another search term.' : isRecruiter ? 'Publish your first role to start receiving applications.' : 'There are no open roles available right now.'}/> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {filteredJobs.map(job=><article key={job._id} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition hover:border-violet-200 hover:bg-white hover:shadow-md sm:p-5">
+                  <div className="flex items-start justify-between gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><BriefcaseBusiness size={19}/></div><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">Active role</span></div>
+                  <h4 className="mt-3 text-base font-bold">{job.title}</h4><p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{job.description}</p>
+                  <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><MapPin size={13}/>{job.location}</span><span className="inline-flex items-center gap-1"><Clock3 size={13}/>{job.jobType}</span>{job.salary > 0 && <span className="font-semibold text-slate-700">Salary: {job.salary.toLocaleString()}</span>}</div>
+                  <div className="mt-4 border-t border-slate-200/70 pt-3">{isRecruiter ? <button onClick={()=>handleViewApplicants(job)} className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 hover:text-violet-900">View applicants <ArrowUpRight size={15}/></button> : <button onClick={()=>setApplyJobId(job._id)} className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700">Apply for this role <ArrowUpRight size={15} className="ml-1 inline"/></button>}</div>
+                </article>)}
+              </div>}
+            </section>
 
-              <div className="bg-white p-6 rounded-lg shadow-md md:col-span-1 border-t-4 border-blue-500 h-fit">
-                <h2 className="text-xl font-bold mb-4">My Applications</h2>
-                {myApplications.length === 0 ? (
-                  <p className="text-gray-500 text-sm">You haven't applied to any jobs yet.</p>
-                ) : (
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                    {myApplications.map((app: any) => (
-                      <div key={app._id} className="p-3 border rounded-md bg-gray-50">
-                        <h3 className="font-bold text-md">{app.job?.title || 'Job Removed'}</h3>
-                        <p className="text-xs text-gray-600 mb-2">{app.job?.location || 'N/A'}</p>
-                        
-                        <div className="flex justify-between items-center mt-2">
-                          <span className={`px-2 py-1 text-xs font-bold rounded-full ${
-                            app.status === 'Accepted' ? 'bg-green-100 text-green-700' :
-                            app.status === 'Rejected' ? 'bg-red-100 text-red-700' :
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {app.status}
-                          </span>
-                          {app.matchScore !== undefined && (
-                            <span className="text-xs font-bold text-blue-600">🤖 {app.matchScore}% Match</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+            {!isRecruiter && <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6"><div className="mb-5"><h3 className="text-lg font-bold">My applications</h3><p className="text-sm text-slate-400">Follow the progress of your applications.</p></div>{myApplications.length===0?<EmptyState title="No applications yet" detail="When you apply for a role, its progress will appear here."/>:<div className="space-y-3">{myApplications.map(app=><div key={app._id} className="flex flex-col justify-between gap-3 rounded-xl border border-slate-100 p-4 sm:flex-row sm:items-center"><div><p className="font-semibold">{app.job?.title || 'Job no longer available'}</p><p className="mt-1 text-xs text-slate-400">{app.job?.location || 'Location unavailable'}</p></div><div className="flex items-center gap-3"><span className="text-xs font-semibold text-violet-700">{app.matchScore !== undefined ? `${app.matchScore}% AI match` : ''}</span><StatusPill status={app.status}/></div></div>)}</div>}</section>}
 
-        </div>
+            {selectedJobApplicants !== null && <section className="rounded-2xl border border-violet-200 bg-white p-5 shadow-lg shadow-violet-100/50 sm:p-6"><div className="mb-5 flex items-start justify-between gap-3"><div><h3 className="text-lg font-bold">Applicants · {activeJobTitle}</h3><p className="text-sm text-slate-400">{selectedJobApplicants.length} application(s) received</p></div><button onClick={()=>setSelectedJobApplicants(null)} className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50" aria-label="Close applicants"><X size={18}/></button></div>{selectedJobApplicants.length===0?<EmptyState title="No applicants yet" detail="New applications will show up here."/>:<div className="space-y-3">{selectedJobApplicants.map(app=><div key={app._id} className="rounded-xl border border-slate-100 p-4"><div className="flex flex-col justify-between gap-3 sm:flex-row"><div><p className="font-bold">{app.candidate?.name || 'Candidate'}</p><p className="text-xs text-slate-400">{app.candidate?.email}</p><p className="mt-2 max-w-2xl text-sm text-slate-600">{app.coverLetter}</p>{app.resumePublicId&&<button onClick={()=>handleOpenResume(app._id)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-violet-700"><Eye size={14}/> View resume</button>}{app.aiSummary&&<p className="mt-3 rounded-lg bg-violet-50 p-3 text-xs leading-5 text-violet-900"><Sparkles size={13} className="mr-1 inline"/>AI insight: {app.aiSummary} Human review is required.</p>}</div><div className="flex flex-wrap items-center gap-2 sm:justify-end">{app.matchScore!==undefined&&<span className="mr-2 text-sm font-bold text-violet-700">{app.matchScore}% match</span>}<StatusPill status={app.status}/><button onClick={()=>handleUpdateStatus(app._id,'Accepted')} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"><CheckCircle2 size={14} className="mr-1 inline"/>Accept</button><button onClick={()=>handleUpdateStatus(app._id,'Rejected')} className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"><Ban size={14} className="mr-1 inline"/>Reject</button></div></div></div>)}</div>}</section>}
+          </div>
+        </main>
       </div>
+
+      {showJobForm && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"><div className="my-6 w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl sm:p-7"><div className="mb-5 flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-violet-600">Recruiting</p><h3 className="mt-1 text-xl font-bold">Publish a new role</h3><p className="text-sm text-slate-400">Share the details candidates need to apply.</p></div><button onClick={()=>setShowJobForm(false)} className="rounded-xl border border-slate-200 p-2 text-slate-500" aria-label="Close form"><X size={18}/></button></div><form onSubmit={handlePostJob} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Job title"><input required value={formData.title} onChange={e=>setFormData({...formData,title:e.target.value})} placeholder="e.g. Product Designer" className="field-input"/></Field>
+        <Field label="Location"><input required value={formData.location} onChange={e=>setFormData({...formData,location:e.target.value})} placeholder="Remote / City" className="field-input"/></Field>
+        <Field label="Salary"><input required min="0" type="number" value={formData.salary} onChange={e=>setFormData({...formData,salary:e.target.value})} placeholder="Annual salary" className="field-input"/></Field>
+        <Field label="Job type"><select value={formData.jobType} onChange={e=>setFormData({...formData,jobType:e.target.value})} className="field-input"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option></select></Field>
+        <Field label="Experience level"><select value={formData.experienceLevel} onChange={e=>setFormData({...formData,experienceLevel:e.target.value})} className="field-input"><option>Entry</option><option>Mid</option><option>Senior</option></select></Field>
+        <Field label="Requirements (comma separated)"><input value={formData.requirements} onChange={e=>setFormData({...formData,requirements:e.target.value})} placeholder="React, TypeScript, UX" className="field-input"/></Field>
+        <div className="sm:col-span-2"><Field label="Job description"><textarea required rows={4} value={formData.description} onChange={e=>setFormData({...formData,description:e.target.value})} placeholder="Describe the role and responsibilities…" className="field-input"/></Field></div>
+        <div className="flex justify-end gap-2 pt-2 sm:col-span-2"><button type="button" onClick={()=>setShowJobForm(false)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600">Cancel</button><button disabled={loading} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"><Plus size={15} className="mr-1 inline"/>{loading?'Publishing…':'Publish job'}</button></div>
+      </form></div></div>}
+
+      {applyJobId && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm"><div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-violet-600">Application</p><h3 className="mt-1 text-xl font-bold">Apply for {jobs.find(job=>job._id===applyJobId)?.title}</h3></div><button onClick={()=>setApplyJobId(null)} aria-label="Close application" className="rounded-lg border p-2"><X size={18}/></button></div><p className="mt-2 text-sm text-slate-500">Attach your resume and add a short note to the hiring team.</p><label className="mt-5 block text-sm font-semibold">Cover letter<textarea rows={4} value={coverLetter} onChange={e=>setCoverLetter(e.target.value)} placeholder="Tell the team why you're a good fit…" className="field-input mt-2"/></label><label className="mt-4 block text-sm font-semibold">Resume (PDF)<span className="mt-2 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-violet-300 bg-violet-50/60 p-4 text-sm font-medium text-violet-800"><UploadCloud size={22}/><span className="min-w-0"><span className="block truncate">{resumeFile?.name || 'Choose a resume file'}</span><span className="text-xs font-normal text-violet-500">Select a file from your device</span></span><input type="file" accept="application/pdf,.pdf" onChange={e=>setResumeFile(e.target.files?.[0]||null)} className="sr-only"/></span></label><div className="mt-6 flex justify-end gap-2"><button onClick={()=>setApplyJobId(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold">Cancel</button><button disabled={loading} onClick={()=>void handleApply(applyJobId)} className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Send size={15} className="mr-1 inline"/>{loading?'Submitting…':'Submit application'}</button></div></div></div>}
     </div>
   );
 };
+
+const Metric = ({icon,label,value,note,tint}:{icon:React.ReactNode;label:string;value:any;note:string;tint:string}) => <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-500">{label}</span><span className={`grid h-10 w-10 place-items-center rounded-xl ${tint==='violet'?'bg-violet-100 text-violet-700':tint==='blue'?'bg-blue-100 text-blue-700':'bg-emerald-100 text-emerald-700'}`}>{icon}</span></div><p className="mt-4 text-3xl font-bold tracking-tight">{value}</p><p className="mt-1 text-xs text-slate-400">{note}</p></div>;
+const EmptyState = ({title,detail}:{title:string;detail:string}) => <div className="grid min-h-36 place-items-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 text-center"><div><div className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-xl bg-white text-slate-400 shadow-sm"><FileText size={18}/></div><p className="text-sm font-semibold text-slate-700">{title}</p><p className="mt-1 text-xs text-slate-400">{detail}</p></div></div>;
+const StatusPill = ({status}:{status:string}) => <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${status==='Accepted'?'bg-emerald-50 text-emerald-700':status==='Rejected'?'bg-rose-50 text-rose-700':status==='Reviewed'?'bg-blue-50 text-blue-700':'bg-amber-50 text-amber-700'}`}>{status}</span>;
+const Field = ({label,children}:{label:string;children:React.ReactNode}) => <label className="block text-sm font-semibold text-slate-700">{label}{children}</label>;
 
 export default Dashboard;

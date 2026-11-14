@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Mongoose Job model: validates job details and links every job to its creating recruiter.
+ * Interview tip: explain what data this layer owns and which layer calls it.
+ */
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IJob extends Document {
@@ -11,6 +15,7 @@ export interface IJob extends Document {
   recruiter: mongoose.Types.ObjectId;
 }
 
+// Job schema: defines the shape and constraints of job documents stored in MongoDB.
 const jobSchema: Schema = new Schema(
   {
     title: { type: String, required: true },

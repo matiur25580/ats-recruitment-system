@@ -1,20 +1,66 @@
+/*
+ * LEARNING NOTE: Client route map and lightweight route guard. Client checks improve navigation UX; backend middleware is the security boundary.
+ * Interview tip: explain the responsibility of this file and how data flows through it.
+ */
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import CandidateProfile from './pages/CandidateProfile';
+import AdminDashboard from './pages/AdminDashboard';
+
+// Route guard: checks the saved session before rendering pages that require login.
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('token');
+  const rawUser = localStorage.getItem('user');
+
+  if (!token || !rawUser) {
+    return <Navigate to="/login" replace />;
+  }
+
+  try {
+    const user = JSON.parse(rawUser);
+    const validRole = ['candidate', 'recruiter', 'admin'].includes(user?.role);
+    if (!user?._id || !validRole) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      return <Navigate to="/login" replace />;
+    }
+  } catch {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+};
 
 function App() {
   return (
     <Router>
-      {/* Toaster যোগ করা হলো */}
       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
-      
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <CandidateProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              {JSON.parse(localStorage.getItem('user') || '{}').role === 'admin' ? <AdminDashboard /> : <Dashboard />}
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Router>
   );

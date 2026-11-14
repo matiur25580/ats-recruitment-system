@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Express application bootstrap: configures middleware, database connection, API routes, and server startup.
+ * Interview tip: explain the responsibility of this file and how data flows through it.
+ */
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -6,9 +10,12 @@ import authRoutes from './routes/authRoutes';
 import jobRoutes from './routes/jobRoutes';
 import applicationRoutes from './routes/applicationRoutes';
 import statsRoutes from './routes/statsRoutes';
+import profileRoutes from './routes/profileRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 dotenv.config();
 
+// Create the Express app; middleware and routers are registered on this shared instance.
 const app = express();
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
   .split(',')
@@ -31,6 +38,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/profile', profileRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, message: 'ATS Backend running' });

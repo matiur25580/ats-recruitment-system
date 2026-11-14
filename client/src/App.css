@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Application component styles. CSS comments describe the visual sections and responsive behavior.
+ * CSS controls presentation only; business rules and authorization belong in TypeScript/backend layers.
+ */
 .counter {
   font-size: 16px;
   padding: 5px 10px;

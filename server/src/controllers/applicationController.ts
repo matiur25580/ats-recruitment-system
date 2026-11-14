@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Application workflow: resume upload, duplicate prevention, advisory AI analysis, private downloads, and recruiter status updates.
+ * Interview tip: describe the input, validation, side effects, and failure path.
+ */
 import { Response } from 'express';
 import Application from '../models/Application';
 import Job from '../models/Job';
@@ -20,6 +24,7 @@ const uploadToCloudinary = (fileBuffer: Buffer): Promise<{ public_id: string }> 
   });
 };
 
+// Apply flow: validate the PDF and job first, prevent duplicates, then persist the resume and application.
 export const applyForJob = async (req: AuthRequest, res: Response): Promise<void> => {
   let uploadedPublicId: string | undefined;
   try {
@@ -33,11 +38,13 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
     const job = await Job.findById(jobId).populate('recruiter', 'email name');
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
 
+    // Check before uploading: a duplicate request should not create an orphaned file.
     const alreadyApplied = await Application.findOne({ job: jobId, candidate: req.user._id });
     if (alreadyApplied) { res.status(400).json({ message: 'You have already applied' }); return; }
 
     const result = await uploadToCloudinary(req.file.buffer);
     uploadedPublicId = result.public_id;
+    // Analysis is optional/advisory; application submission can continue if the AI service is unavailable.
     const aiAnalysis = await analyzeResumeWithAI(req.file.buffer, job.description, job.requirements);
 
     const application = new Application({
@@ -88,6 +95,7 @@ export const getApplicationResume = async (req: AuthRequest, res: Response): Pro
     if (!isCandidate && !isRecruiter) { res.status(403).json({ message: 'Not authorized' }); return; }
     if (!application.resumePublicId) { res.status(404).json({ message: 'Resume not available' }); return; }
 
+    // Short expiry limits the lifetime of a private resume download URL.
     const expiresAt = Math.floor(Date.now() / 1000) + 60;
     const url = cloudinary.utils.private_download_url(application.resumePublicId, 'pdf', {
       resource_type: 'raw',

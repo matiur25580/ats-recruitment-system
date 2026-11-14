@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Vite build and development-server configuration, including the API proxy.
+ * Interview tip: explain the user action, state change, API request, and feedback shown on this screen.
+ */
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
