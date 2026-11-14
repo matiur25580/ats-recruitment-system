@@ -75,7 +75,7 @@ test('forgot and reset password screens are usable on mobile', async ({ page }) 
     status: 200, contentType: 'application/json',
     body: JSON.stringify({ message: 'Your password has been reset successfully. Please sign in with your new password.' }),
   }));
-  await page.goto('/reset-password?token=e2e-reset-token');
+  await page.goto('/reset-password#token=e2e-reset-token');
   await page.locator('input[autocomplete="new-password"]').nth(0).fill('NewStrongPass123!');
   await page.locator('input[autocomplete="new-password"]').nth(1).fill('NewStrongPass123!');
   await page.getByRole('button', { name: 'Reset password' }).click();
