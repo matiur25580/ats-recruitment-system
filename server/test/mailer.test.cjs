@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { sendEmail, configureMailerTransport } = require('../dist/utils/mailer');
+process.env.EMAIL_USER = 'noreply@example.test';
 
 test('email delivery validates input, retries transient SMTP errors once, and reports failure', async () => {
   let calls = 0;
