@@ -38,6 +38,11 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
       res.status(401).json({ message: 'Not authorized, user not found' });
       return;
     }
+    const tokenVersion = typeof (decoded as JwtPayload).tokenVersion === 'number' ? (decoded as JwtPayload).tokenVersion : 0;
+    if (tokenVersion !== (user.tokenVersion || 0)) {
+      res.status(401).json({ message: 'Session expired. Please sign in again.' });
+      return;
+    }
 
     req.user = user;
     next();
