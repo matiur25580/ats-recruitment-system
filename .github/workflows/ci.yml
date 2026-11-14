@@ -65,3 +65,25 @@ jobs:
       - name: Build frontend
         working-directory: client
         run: npm run build
+
+      - name: Install Playwright test runner
+        working-directory: client
+        run: npm install --no-save --package-lock=false @playwright/test
+
+      - name: Install Chromium for desktop and mobile browser checks
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser E2E and responsive layout checks
+        working-directory: client
+        env:
+          CI: true
+        run: npx playwright test
+
+      - name: Upload browser test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hireflow-playwright-report
+          path: client/playwright-report/
+          if-no-files-found: ignore
