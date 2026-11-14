@@ -39,6 +39,9 @@ export interface IUser extends Document {
   resumePublicId?: string;
   resumeFileName?: string;
   resumeUploadedAt?: Date;
+  tokenVersion: number;
+  passwordResetTokenHash?: string;
+  passwordResetExpiresAt?: Date;
   matchPassword: (enteredPassword: string) => Promise<boolean>;
 }
 
@@ -67,6 +70,9 @@ const userSchema: Schema = new Schema(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
+    tokenVersion: { type: Number, default: 0 },
+    passwordResetTokenHash: { type: String, select: false },
+    passwordResetExpiresAt: { type: Date, select: false },
     role: {
       type: String,
       enum: ['admin', 'recruiter', 'candidate'],
