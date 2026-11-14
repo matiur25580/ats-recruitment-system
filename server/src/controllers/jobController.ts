@@ -60,18 +60,11 @@ const pagination = (query: AuthRequest['query']) => {
   return { page, limit, skip: (page - 1) * limit };
 };
 
-const escapeRegex = (value: string): string => value.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\export const getJobs = async (_req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const jobs = await Job.find({
-      status: { $in: ['Open', null] },
-      $or: [{ expiresAt: { $exists: false } }, { expiresAt: null }, { expiresAt: { $gt: new Date() } }],
-    }).populate('recruiter', 'name email').sort({ createdAt: -1 });
-    res.json(jobs);
-  } catch (error: unknown) {
-    console.error('Failed to retrieve jobs', error);
-    res.status(500).json({ message: 'Unable to retrieve jobs' });
-  }
-};');
+const escapeRegex = (value: string): string => {
+  const slash = String.fromCharCode(92);
+  const special = '.+*?^$()[]{}|' + slash;
+  return value.split('').map((character) => special.includes(character) ? slash + character : character).join('');
+};
 
 export const getJobs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
