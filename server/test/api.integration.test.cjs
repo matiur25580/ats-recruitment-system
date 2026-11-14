@@ -6,6 +6,11 @@ const Job = require('../dist/models/Job').default;
 const Application = require('../dist/models/Application').default;
 const AuditLog = require('../dist/models/AuditLog').default;
 const cloudinary = require('../dist/config/cloudinary').default;
+const mailer = require('../dist/utils/mailer');
+let capturedResetEmail = null;
+mailer.configureMailerTransport({ sendMail: async (options) => { capturedResetEmail = options; return { messageId: 'integration-message' }; } });
+process.env.EMAIL_USER = process.env.EMAIL_USER || 'noreply@example.test';
+process.env.CLIENT_URL = 'http://localhost:5173';
 
 // Deterministic Cloudinary SDK contract stub: the application route, validation, persistence and URL signing are exercised without external credentials.
 let cloudinaryUploadCount = 0;
@@ -278,6 +283,47 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       const deleted = await request('/api/profile/resume', { method: 'DELETE', headers: bearer(candidateToken) });
       assert.equal(deleted.response.status, 200);
       assert.ok(destroyedCloudinaryIds.includes('integration/private-resume-2'));
+    });
+
+    await t.test('password recovery uses one-time expiring tokens and revokes existing sessions', async () => {
+      const recoveryUser = await User.create({ name: 'Recovery User', email: 'recovery.integration@example.test', password: 'OriginalPass123!', role: 'candidate' });
+      const originalLogin = await request('/api/auth/login', {
+        method: 'POST', body: JSON.stringify({ email: recoveryUser.email, password: 'OriginalPass123!' }),
+      });
+      assert.equal(originalLogin.response.status, 200);
+
+      const requested = await request('/api/auth/forgot-password', {
+        method: 'POST', body: JSON.stringify({ email: recoveryUser.email }),
+      });
+      assert.equal(requested.response.status, 200);
+      assert.match(requested.body.message, /If an account exists/);
+      assert.ok(capturedResetEmail?.text);
+      const resetUrl = capturedResetEmail.text.match(/http:\/\/localhost:5173\/reset-password\?token=([a-f0-9]+)/)?.[0];
+      assert.ok(resetUrl, 'reset email should contain a frontend reset URL');
+      const resetToken = new URL(resetUrl).searchParams.get('token');
+
+      const reset = await request('/api/auth/reset-password', {
+        method: 'POST', body: JSON.stringify({ token: resetToken, password: 'NewStrongPass123!' }),
+      });
+      assert.equal(reset.response.status, 200);
+
+      const oldSession = await request('/api/jobs/mine', { headers: bearer(originalLogin.body.token) });
+      assert.equal(oldSession.response.status, 401);
+      const newLogin = await request('/api/auth/login', {
+        method: 'POST', body: JSON.stringify({ email: recoveryUser.email, password: 'NewStrongPass123!' }),
+      });
+      assert.equal(newLogin.response.status, 200);
+
+      const reused = await request('/api/auth/reset-password', {
+        method: 'POST', body: JSON.stringify({ token: resetToken, password: 'AnotherStrong123!' }),
+      });
+      assert.equal(reused.response.status, 400);
+
+      const unknown = await request('/api/auth/forgot-password', {
+        method: 'POST', body: JSON.stringify({ email: 'unknown.recovery@example.test' }),
+      });
+      assert.equal(unknown.response.status, 200);
+      assert.equal(unknown.body.message, requested.body.message);
     });
 
     await t.test('admin audit feed is role-protected, paginated and contains safe action metadata', async () => {
