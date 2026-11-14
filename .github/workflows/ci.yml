@@ -85,5 +85,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: hireflow-playwright-report
-          path: client/playwright-report/
+          path: |
+            client/playwright-report/
+            client/test-results/
           if-no-files-found: ignore
