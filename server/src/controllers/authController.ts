@@ -34,7 +34,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
 
     const userExists = await User.findOne({ email });
     if (userExists) {
-      res.status(409).json({ message: 'User already exists' });
+      res.status(409).json({ message: 'This email is already registered. Please log in.' });
       return;
     }
 
@@ -53,7 +53,7 @@ export const registerUser = async (req: Request, res: Response): Promise<void> =
       res.status(409).json({ message: 'User already exists' });
       return;
     }
-    console.error('Registration failed', error);
+    console.error('Registration failed', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ message: 'Unable to register user' });
   }
 };
@@ -70,7 +70,14 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
 
     const user = await User.findOne({ email });
     if (!user || !(await user.matchPassword(password))) {
-      res.status(401).json({ message: 'Invalid email or password' });
+      if (!user) {
+      res.status(404).json({ message: 'This email does not exist. Please register first.' });
+      return;
+    }
+    if (!(await user.matchPassword(password))) {
+      res.status(401).json({ message: 'Incorrect password. Please try again.' });
+      return;
+    }
       return;
     }
 
@@ -82,7 +89,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
       token: generateToken(user._id.toString()),
     });
   } catch (error: unknown) {
-    console.error('Login failed', error);
+    console.error('Login failed', error instanceof Error ? error.message : 'Unknown error');
     res.status(500).json({ message: 'Unable to log in' });
   }
 };
