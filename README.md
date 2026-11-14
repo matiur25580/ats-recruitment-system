@@ -46,14 +46,31 @@ The platform includes **AI-assisted resume-to-job analysis** to provide an addit
 
 > **Responsible hiring:** AI match scores are decision-support signals, not objective measures of candidate quality. Recruiters must review applications themselves and should never rely on an AI score as the sole hiring criterion.
 
-## Screens and design
+## People behind every great hire
 
-The interface uses a responsive SaaS workspace layout with:
-- A focused sign-in and candidate registration experience.
-- A role-aware dashboard with metrics, charts and job cards.
-- A candidate profile editor with completion progress and resume controls.
-- Responsive navigation and layouts for smaller screens.
-- Accessible form labels, keyboard focus states and feedback messages.
+The images below are illustrative portraits and workplace photography representing the two people who use HireFlow. They are **not application screenshots or real HireFlow users**.
+
+### Candidate experience
+
+| Discovering opportunities | Building a profile |
+|---|---|
+| <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional man" /> | <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional woman" /> |
+| <img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, smiling professional" /> | <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, confident professional" /> |
+| <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional headshot" /> | <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait, professional woman headshot" /> |
+| <img src="https://images.unsplash.com/photo-1507591064344-4c6ce005b128?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate portrait in a workplace" /> | <img src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=720&q=85" width="320" alt="Candidate collaborating with colleagues" /> |
+
+### Recruiter experience
+
+| Hiring conversations | Team collaboration |
+|---|---|
+| <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruiter professional portrait" /> | <img src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruiter discussing candidates with a colleague" /> |
+| <img src="https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruitment team working together" /> | <img src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=720&q=85" width="320" alt="Hiring team collaborating at a table" /> |
+| <img src="https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruiter team meeting" /> | <img src="https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=720&q=85" width="320" alt="Recruitment planning session" /> |
+| <img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=720&q=85" width="320" alt="Professional team discussion" /> | <img src="https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&fit=crop&w=720&q=85" width="320" alt="Colleagues in a collaborative workplace" /> |
+
+### Product interface
+
+The current UI is implemented in the `client/` application. Product screenshots will be added after a verified browser walkthrough so that the README never presents mockups as live application screens.
 
 ## Technology stack
 
