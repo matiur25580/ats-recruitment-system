@@ -3,7 +3,7 @@
  * Interview tip: trace the HTTP method + URL through middleware to the controller.
  */
 import express from 'express';
-import { createJob, getJobs, updateJob, updateJobLifecycle } from '../controllers/jobController';
+import { createJob, getJobs, getRecruiterJobs, updateJob, updateJobLifecycle } from '../controllers/jobController';
 import { protect } from '../middlewares/authMiddleware';
 import { authorizeRoles } from '../middlewares/roleMiddleware';
 
@@ -15,6 +15,7 @@ router.route('/')
   .get(getJobs)
   .post(protect, authorizeRoles('recruiter'), createJob);
 
+router.get('/mine', protect, authorizeRoles('recruiter'), getRecruiterJobs);
 router.put('/:jobId', protect, authorizeRoles('recruiter'), updateJob);
 router.patch('/:jobId/status', protect, authorizeRoles('recruiter'), updateJobLifecycle);
 
