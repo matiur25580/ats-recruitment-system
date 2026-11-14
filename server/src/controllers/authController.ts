@@ -2,47 +2,81 @@ import { Request, Response } from 'express';
 import User from '../models/User';
 import generateToken from '../utils/generateToken';
 
+const isDuplicateKeyError = (error: unknown): boolean =>
+  typeof error === 'object' && error !== null && 'code' in error && error.code === 11000;
+
 export const registerUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, role } = req.body;
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      res.status(400).json({ message: 'User already exists' });
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    if (!name || !email || !password) {
+      res.status(400).json({ message: 'Name, email, and password are required' });
       return;
     }
-    const user = await User.create({ name, email, password, role });
-    if (user) {
-      res.status(201).json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id.toString()),
-      });
-    } else {
-      res.status(400).json({ message: 'Invalid user data' });
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ message: 'Please provide a valid email address' });
+      return;
     }
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+
+    if (password.length < 8) {
+      res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      return;
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      res.status(409).json({ message: 'User already exists' });
+      return;
+    }
+
+    // Public registration must never grant privileged roles.
+    const user = await User.create({ name, email, password, role: 'candidate' });
+
+    res.status(201).json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id.toString()),
+    });
+  } catch (error: unknown) {
+    if (isDuplicateKeyError(error)) {
+      res.status(409).json({ message: 'User already exists' });
+      return;
+    }
+    console.error('Registration failed', error);
+    res.status(500).json({ message: 'Unable to register user' });
   }
 };
 
 export const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (user && (await user.matchPassword(password))) {
-      res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id.toString()),
-      });
-    } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+
+    if (!email || !password) {
+      res.status(400).json({ message: 'Email and password are required' });
+      return;
     }
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+
+    const user = await User.findOne({ email });
+    if (!user || !(await user.matchPassword(password))) {
+      res.status(401).json({ message: 'Invalid email or password' });
+      return;
+    }
+
+    res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id.toString()),
+    });
+  } catch (error: unknown) {
+    console.error('Login failed', error);
+    res.status(500).json({ message: 'Unable to log in' });
   }
 };
