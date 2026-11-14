@@ -1,6 +1,10 @@
 # LEARNING NOTE: GitHub Actions CI workflow. Each job installs dependencies and runs checks so broken changes are caught before merging.
 name: CI
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
