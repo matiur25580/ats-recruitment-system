@@ -119,3 +119,14 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
     res.status(500).json({ message: 'Unable to change job status' });
   }
 };
+
+
+export const getRecruiterJobs = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const jobs = await Job.find({ recruiter: req.user._id }).sort({ createdAt: -1 });
+    res.json(jobs);
+  } catch (error: unknown) {
+    console.error('Failed to retrieve recruiter jobs', error);
+    res.status(500).json({ message: 'Unable to retrieve your jobs' });
+  }
+};
