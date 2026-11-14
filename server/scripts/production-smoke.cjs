@@ -15,7 +15,7 @@ function createPdf() {
     '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    (() => { const stream = 'BT /F1 12 Tf 72 720 Td (HireFlow integration smoke test) Tj ET\\n'; return `<< /Length ${Buffer.byteLength(stream, 'binary')} >>\\nstream\\n${stream}endstream`; })(),
+    (() => { const newline = String.fromCharCode(10); const stream = 'BT /F1 12 Tf 72 720 Td (HireFlow integration smoke test) Tj ET' + newline; return '<< /Length ' + Buffer.byteLength(stream, 'binary') + ' >>' + newline + 'stream' + newline + stream + 'endstream'; })(),
   ];
   let pdf = '%PDF-1.4\n';
   const offsets = [0];
