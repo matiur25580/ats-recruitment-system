@@ -34,6 +34,10 @@ jobs:
         working-directory: server
         run: npm run build
 
+      - name: Test backend
+        working-directory: server
+        run: npm test
+
       - name: Install frontend dependencies
         working-directory: client
         run: npm ci
