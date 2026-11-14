@@ -4,7 +4,7 @@
  */
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 
 dotenv.config();
 
@@ -20,7 +20,13 @@ export const analyzeResumeWithAI = async (
   jobRequirements: string[],
 ): Promise<ResumeAnalysis | null> => {
   try {
-    const pdfData = await pdfParse(pdfBuffer);
+    const parser = new PDFParse({ data: pdfBuffer });
+    let pdfData: { text: string };
+    try {
+      pdfData = await parser.getText();
+    } finally {
+      await parser.destroy();
+    }
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
 
