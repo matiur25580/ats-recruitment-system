@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Application endpoints: role-protected apply, review, status, and resume access workflows.
+ * Interview tip: trace the HTTP method + URL through middleware to the controller.
+ */
 import express from 'express';
 import multer from 'multer';
 import { 
@@ -10,6 +14,7 @@ import {
 import { protect } from '../middlewares/authMiddleware';
 import { authorizeRoles } from '../middlewares/roleMiddleware';
 
+// Keep the upload in memory temporarily so the controller can validate and send it to private storage.
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,

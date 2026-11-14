@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Candidate-only profile endpoints. Router-level middleware protects all profile and resume operations.
+ * Interview tip: trace the HTTP method + URL through middleware to the controller.
+ */
 import express from 'express';
 import multer from 'multer';
 import {
@@ -17,6 +21,7 @@ const upload = multer({
 });
 const router = express.Router();
 
+// Apply authentication and candidate-role checks to every route declared below.
 router.use(protect, authorizeRoles('candidate'));
 router.route('/').get(getCandidateProfile).put(updateCandidateProfile);
 router.route('/resume')

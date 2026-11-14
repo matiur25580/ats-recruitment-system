@@ -1,3 +1,7 @@
+/*
+ * LEARNING NOTE: Job handlers: validate job fields, attach recruiter ownership, and return available jobs.
+ * Interview tip: trace the HTTP method + URL through middleware to the controller.
+ */
 import { Response } from 'express';
 import Job from '../models/Job';
 import { AuthRequest } from '../middlewares/authMiddleware';
@@ -8,6 +12,7 @@ const allowedExperienceLevels = ['Entry', 'Mid', 'Senior'] as const;
 // @desc    Create a new job
 // @route   POST /api/jobs
 // @access  Private/Recruiter
+// Validate untrusted request data before creating a database record owned by the signed-in recruiter.
 export const createJob = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const {
