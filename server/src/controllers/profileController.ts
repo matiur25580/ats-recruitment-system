@@ -82,7 +82,8 @@ export const updateCandidateProfile = async (req: AuthRequest, res: Response): P
       if (!Array.isArray(body.skills) || body.skills.length > 40 || body.skills.some((skill: unknown) => typeof skill !== 'string')) {
         res.status(400).json({ message: 'Skills must be a list of up to 40 items' }); return;
       }
-      user.skills = [...new Set(body.skills.map((skill: string) => skill.trim().slice(0, 60)).filter(Boolean))];
+      const skills = body.skills as string[];
+      user.skills = [...new Set(skills.map((skill) => skill.trim().slice(0, 60)).filter(Boolean))];
     }
     if (body.experience !== undefined) {
       const experience = normalizeExperience(body.experience);
