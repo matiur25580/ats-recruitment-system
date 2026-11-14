@@ -30,7 +30,11 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
   let uploadedPublicId: string | undefined;
   try {
     const { jobId } = req.params;
-    const coverLetter = req.body?.coverLetter || '';
+    const coverLetter = req.body?.coverLetter ?? '';
+    if (typeof coverLetter !== 'string' || coverLetter.length > 5000) {
+      res.status(400).json({ message: 'Cover letter must be 5000 characters or fewer' });
+      return;
+    }
     if (!req.file || req.file.mimetype !== 'application/pdf' || !isValidPdfBuffer(req.file.buffer)) {
       res.status(400).json({ message: 'Please upload a valid PDF resume' });
       return;
@@ -128,8 +132,9 @@ export const getJobApplications = async (req: AuthRequest, res: Response): Promi
     
     const applications = await Application.find({ job: jobId }).populate('candidate', 'name email');
     res.json(applications);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    console.error('Failed to retrieve job applications', error);
+    res.status(500).json({ message: 'Unable to retrieve applications' });
   }
 };
 
@@ -155,6 +160,17 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     // Repeated requests are idempotent: do not create duplicate audit entries or send duplicate emails.
     if (application.status === status) {
       res.json({ message: 'Application already has this status', application });
+      return;
+    }
+
+    const allowedTransitions: Record<typeof status, readonly string[]> = {
+      Pending: [],
+      Reviewed: ['Pending'],
+      Accepted: ['Pending', 'Reviewed'],
+      Rejected: ['Pending', 'Reviewed'],
+    };
+    if (!allowedTransitions[status].includes(application.status)) {
+      res.status(409).json({ message: `Cannot change application status from ${application.status} to ${status}` });
       return;
     }
 
@@ -191,8 +207,9 @@ export const getCandidateApplications = async (req: AuthRequest, res: Response):
       .populate('job', 'title location salary jobType')
       .sort({ createdAt: -1 });
     res.json(applications);
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    console.error('Failed to retrieve candidate applications', error);
+    res.status(500).json({ message: 'Unable to retrieve your applications' });
   }
 };
 
