@@ -308,7 +308,7 @@ Authorization: Bearer <your-jwt>
 
 ## Production integration verification
 
-A manual GitHub Actions workflow is available at **Actions → Production integration smoke test → Run workflow**. It uploads a temporary private PDF to Cloudinary, downloads it through a signed URL, sends that PDF through Gemini analysis, sends one test email through the configured SMTP provider, and checks the deployed API and frontend HTTP endpoints. The temporary Cloudinary object is deleted after the run.
+The `Production integration smoke test` workflow is configured for manual dispatch. It uploads a temporary private PDF to Cloudinary, downloads it through a signed URL, sends that PDF through Gemini analysis, sends one test email through the configured SMTP provider, and checks the deployed API and frontend HTTP endpoints. The temporary Cloudinary object is deleted after the run. GitHub exposes manual dispatch after the workflow file exists on the repository's default branch; until this feature branch is merged, run the same script directly from `server/` after `npm ci` and `npm run build`.
 
 Before running it, create a GitHub Actions environment named `production-smoke` and configure:
 
