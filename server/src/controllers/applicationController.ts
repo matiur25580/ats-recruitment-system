@@ -11,6 +11,7 @@ import cloudinary from '../config/cloudinary';
 import { analyzeResumeWithAI } from '../utils/aiService';
 import { sendEmail } from '../utils/mailer'; // ইমেইল ফাংশন ইম্পোর্ট
 import { isValidPdfBuffer } from '../utils/validation';
+import { recordAuditEvent } from '../utils/audit';
 
 const uploadToCloudinary = (fileBuffer: Buffer): Promise<{ public_id: string }> => {
   return new Promise((resolve, reject) => {
@@ -67,6 +68,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
 
     await application.save();
     uploadedPublicId = undefined;
+    await recordAuditEvent({ actorId: req.user._id, action: 'application.submitted', entityType: 'Application', entityId: application._id, metadata: { jobId: job._id }, requestId: req.header('x-request-id') });
 
     // রিক্রুটারকে ইমেইল পাঠানো
     const recruiter = job.recruiter as any;
@@ -199,9 +201,11 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
       return;
     }
 
+    const previousStatus = application.status;
     application.status = status;
     application.statusHistory.push({ status, changedBy: req.user._id, changedAt: new Date() });
     await application.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'application.status_changed', entityType: 'Application', entityId: application._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
 
     // ক্যান্ডিডেটকে ইমেইল পাঠানো
     const candidate = application.candidate as any;
@@ -254,6 +258,7 @@ export const addRecruiterNote = async (req: AuthRequest, res: Response): Promise
     }
     application.recruiterNotes.push({ author: req.user._id, note: note.trim(), createdAt: new Date() });
     await application.save();
+    await recordAuditEvent({ actorId: req.user._id, action: 'application.note_added', entityType: 'Application', entityId: application._id, metadata: {}, requestId: req.header('x-request-id') });
     res.status(201).json({ message: 'Recruiter note added', notes: application.recruiterNotes });
   } catch (error: unknown) {
     console.error('Failed to add recruiter note', error);
