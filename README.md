@@ -69,8 +69,8 @@ The interface uses a responsive SaaS workspace layout with:
 | Database | MongoDB, Mongoose |
 | Authentication | JSON Web Tokens (JWT), bcryptjs |
 | Resume storage | Cloudinary private raw resources |
-| AI analysis | Google Gemini API, pdf-parse |
-| Email | Nodemailer (Gmail SMTP configuration) |
+| AI analysis | Google Gemini API, pdf-parse v2 |
+| Email | Nodemailer (configurable SMTP with bounded retry) |
 | CI | GitHub Actions |
 
 ## Architecture
@@ -110,7 +110,7 @@ Express REST API
 │       ├── config/         # Cloudinary configuration
 │       ├── controllers/    # API business logic
 │       ├── middlewares/    # JWT authentication and role checks
-│       ├── models/         # User, Job and Application schemas
+│       ├── models/         # User, Job, Application and AuditLog schemas
 │       ├── routes/         # REST API route definitions
 │       └── utils/          # AI, JWT and email helpers
 ├── docs/
@@ -162,9 +162,14 @@ CLOUDINARY_API_SECRET=
 # Optional: AI resume analysis
 GEMINI_API_KEY=
 
-# Optional: email notifications (Gmail app password, not your normal password)
+# Optional: email notifications (SMTP credentials)
 EMAIL_USER=
 EMAIL_PASS=
+# Optional generic SMTP provider (if omitted, Gmail service is used)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_SECURE=false
+EMAIL_FROM=
 ```
 
 Keep real credentials private. Never commit `.env` files, API keys, database URLs or SMTP passwords.
@@ -226,6 +231,8 @@ All API paths below are mounted under `/api`.
 | GET | `/profile/resume` | Candidate | Get own resume download URL |
 | DELETE | `/profile/resume` | Candidate | Remove own resume |
 | GET | `/stats/recruiter` | Recruiter | Read recruiter dashboard metrics |
+| GET | `/admin/overview` | Admin | Read platform-wide aggregate metrics |
+| GET | `/admin/audit-logs` | Admin | Read paginated, filtered security/activity audit events |
 
 Protected endpoints expect:
 
@@ -264,22 +271,28 @@ Authorization: Bearer <your-jwt>
 | `npm run build` | Compile TypeScript into `server/dist` |
 | `npm start` | Start the compiled API |
 
-> **Testing status:** the backend `test` script is currently a placeholder and no automated backend test suite is configured yet. The CI workflow currently installs dependencies, compiles the backend, lints the frontend and builds the frontend. A passing CI build is not the same as a full end-to-end test against a live MongoDB/Cloudinary/Gemini environment.
+> **Testing status:** automated backend validation and MongoDB-backed API integration tests run in CI. The suite covers role restrictions, job ownership, application workflows, candidate/recruiter resume access, private Cloudinary SDK contract behavior, admin audit access and email retry behavior. External Cloudinary, SMTP and Gemini services are stubbed or omitted in CI; configure real credentials and run a deployment smoke test before production use.
 
-## Current limitations and next improvements
+## Search, pagination and auditability
 
-The current implementation provides the core candidate and recruiter journey. A deeper product audit identified these valuable next steps:
+- Public jobs and recruiter-owned jobs use server-side pagination and search. Public filters include job type, experience level and location; recruiter listings support job status.
+- Recruiter applicant lists support pagination, candidate name/email or cover-letter search, and application status filtering.
+- Admins can view a paginated audit feed at `GET /api/admin/audit-logs`, with optional `action` and `entityType` filters.
+- Audit events record job creation/updates/status changes, application submissions/status changes and recruiter notes. They store safe metadata only—not resume bytes, credentials or request bodies.
+- SMTP can use Gmail via `EMAIL_USER` / `EMAIL_PASS`, or a generic provider via `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE` and the same credentials. Delivery retries once; notification failure does not roll back a saved application or status.
 
-1. **Automated tests** — backend unit/integration tests, API authorization tests and frontend component tests.
-2. **Password recovery and email verification** — secure, expiring, single-use tokens and account verification.
-3. **Job lifecycle management** — edit, close/reopen, archive and expiry dates for job posts.
-4. **Job search upgrades** — server-side filters, sorting, pagination and location/experience filters.
-5. **Application timeline** — audit history of status changes, timestamps and recruiter notes.
-6. **Recruiter/admin separation** — a dedicated admin experience for managing recruiter accounts and platform-level metrics.
-7. **Candidate engagement** — saved jobs, application withdrawal and notification preferences.
-8. **Production hardening** — rate limiting, structured request logging, centralized error handling, security headers and stronger observability.
+## Remaining production-readiness work
 
-These are proposed improvements, not features currently claimed as implemented.
+The core candidate/recruiter workflows, job lifecycle, pagination, audit events and CI checks are implemented. Before treating this as a production deployment, the following still require environment-specific work:
+
+1. Configure and verify real Cloudinary credentials, signed private downloads and storage retention in the target account.
+2. Configure SMTP credentials and verify sender reputation, delivery, bounce handling and operational alerting.
+3. Configure Gemini credentials and validate extraction/analysis on representative, valid PDF resumes; AI remains advisory.
+4. Add password recovery, email verification, account lifecycle controls and optional MFA.
+5. Add frontend component/browser E2E coverage and load/performance testing.
+6. Define production backups, monitoring, incident response, privacy retention and compliance policies.
+
+A green CI run proves the checked-in code builds and the automated tests pass; it does not certify external provider credentials, deployment infrastructure or legal/compliance readiness.
 
 ## Learning and interview preparation
 
