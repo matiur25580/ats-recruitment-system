@@ -50,6 +50,10 @@ jobs:
         working-directory: server
         run: npm run build
 
+      - name: Check production smoke script syntax
+        working-directory: server
+        run: node --check scripts/production-smoke.cjs
+
       - name: Test backend
         working-directory: server
         run: npm test
