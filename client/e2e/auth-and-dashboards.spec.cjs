@@ -15,7 +15,6 @@ async function mockDashboardApi(page, role) {
     }
     if (url.pathname.endsWith('/applications/my-applications')) return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     if (route.request().method() === 'POST' && url.pathname.endsWith('/applications/job-1')) return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ message: 'Application submitted successfully', application: { _id: 'application-1' } }) });
-    if (route.request().method() === 'POST' && url.pathname.endsWith('/jobs')) return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ _id: 'job-new', title: 'Platform Engineer' }) });
     if (url.pathname.endsWith('/stats/recruiter')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ totalJobs: 0, totalApplications: 0, averageMatchScore: 0, statusData: [] }) });
     return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
