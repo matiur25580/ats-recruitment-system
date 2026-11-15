@@ -111,6 +111,10 @@ Express REST API
     └── ci.yml
 ```
 
+## Production deployment
+
+See **[Render + Vercel + MongoDB Atlas deployment guide](DEPLOYMENT.md)** for the production topology, exact build settings, environment variables, Atlas network restrictions and post-deploy checklist. A Render Blueprint is provided at `render.yaml`; Vercel SPA routing is configured in `client/vercel.json`.
+
 ## Getting started
 
 ### Prerequisites
