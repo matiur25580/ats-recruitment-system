@@ -57,6 +57,17 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 
   try {
+    await t.test('liveness and MongoDB readiness endpoints report deployment health accurately', async () => {
+      const live = await request('/health');
+      assert.equal(live.response.status, 200);
+      assert.equal(live.body.ok, true);
+
+      const ready = await request('/ready');
+      assert.equal(ready.response.status, 200);
+      assert.equal(ready.body.ok, true);
+      assert.equal(ready.body.database, 'connected');
+    });
+
     await t.test('public registration always creates a candidate and login issues a usable token', async () => {
       const registered = await request('/api/auth/register', {
         method: 'POST',

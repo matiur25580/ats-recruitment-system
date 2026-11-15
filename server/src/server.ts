@@ -19,6 +19,17 @@ dotenv.config();
 
 export const createApp = (): express.Express => {
   const app = express();
+  const configuredProxyHops = process.env.TRUST_PROXY_HOPS;
+  const trustProxyHops = configuredProxyHops === undefined
+    ? (process.env.NODE_ENV === 'production' ? 1 : 0)
+    : Number(configuredProxyHops);
+
+  if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 5) {
+    throw new Error('TRUST_PROXY_HOPS must be an integer between 0 and 5');
+  }
+  // Render terminates TLS at its edge proxy; trust only the configured proxy hop count.
+  app.set('trust proxy', trustProxyHops);
+
   const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
     .split(',')
     .map((origin) => origin.trim())
@@ -43,8 +54,18 @@ export const createApp = (): express.Express => {
   app.use('/api/profile', profileRoutes);
   app.use('/api/admin', adminRoutes);
 
+  // Liveness: confirms the Node process and HTTP listener are responding.
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, message: 'ATS Backend running' });
+    res.json({ ok: true, message: 'HireFlow API is running' });
+  });
+
+  // Readiness: Render should route traffic only after the MongoDB connection is ready.
+  app.get('/ready', (_req, res) => {
+    const databaseReady = mongoose.connection.readyState === 1;
+    res.status(databaseReady ? 200 : 503).json({
+      ok: databaseReady,
+      database: databaseReady ? 'connected' : 'disconnected',
+    });
   });
 
   app.use(notFoundHandler);
