@@ -11,7 +11,7 @@ import { AuthRequest } from '../middlewares/authMiddleware';
 export const getRecruiterStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // ১. রিক্রুটারের সব জব বের করা
-    const jobs = await Job.find({ recruiter: req.user._id });
+    const jobs = await Job.find({ recruiter: req.user!._id });
     const jobIds = jobs.map(job => job._id);
 
     // ২. এই জবগুলোতে আসা সব অ্যাপ্লিকেশন বের করা
