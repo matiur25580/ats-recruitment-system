@@ -44,9 +44,9 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
     const createdJob = await Job.create({
       ...normalizedJobDetails(req.body),
       ...(expiresAt ? { expiresAt } : {}),
-      recruiter: req.user._id,
+      recruiter: req.user!._id,
     });
-    await recordAuditEvent({ actorId: req.user._id, action: 'job.created', entityType: 'Job', entityId: createdJob._id, metadata: { status: createdJob.status }, requestId: req.header('x-request-id') });
+    await recordAuditEvent({ actorId: req.user!._id, action: 'job.created', entityType: 'Job', entityId: createdJob._id, metadata: { status: createdJob.status }, requestId: req.header('x-request-id') });
     res.status(201).json(createdJob);
   } catch (error: unknown) {
     console.error('Failed to create job', error);
@@ -99,7 +99,7 @@ export const updateJob = async (req: AuthRequest, res: Response): Promise<void> 
   try {
     const job = await Job.findById(req.params.jobId);
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
-    if (job.recruiter.toString() !== req.user._id.toString()) {
+    if (job.recruiter.toString() !== req.user!._id.toString()) {
       res.status(403).json({ message: 'Not authorized to manage this job' }); return;
     }
     if (job.status === 'Archived') {
@@ -122,7 +122,7 @@ export const updateJob = async (req: AuthRequest, res: Response): Promise<void> 
     }
     Object.assign(job, normalizedJobDetails(req.body));
     await job.save();
-    await recordAuditEvent({ actorId: req.user._id, action: 'job.updated', entityType: 'Job', entityId: job._id, metadata: { status: job.status }, requestId: req.header('x-request-id') });
+    await recordAuditEvent({ actorId: req.user!._id, action: 'job.updated', entityType: 'Job', entityId: job._id, metadata: { status: job.status }, requestId: req.header('x-request-id') });
     res.json(job);
   } catch (error: unknown) {
     console.error('Failed to update job', error);
@@ -138,7 +138,7 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
     }
     const job = await Job.findById(req.params.jobId);
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
-    if (job.recruiter.toString() !== req.user._id.toString()) {
+    if (job.recruiter.toString() !== req.user!._id.toString()) {
       res.status(403).json({ message: 'Not authorized to manage this job' }); return;
     }
     if (job.status === 'Archived' && status !== 'Archived') {
@@ -150,7 +150,7 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
     const previousStatus = job.status;
     job.status = status;
     await job.save();
-    await recordAuditEvent({ actorId: req.user._id, action: 'job.status_changed', entityType: 'Job', entityId: job._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
+    await recordAuditEvent({ actorId: req.user!._id, action: 'job.status_changed', entityType: 'Job', entityId: job._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
     res.json({ message: `Job ${status.toLowerCase()} successfully`, job });
   } catch (error: unknown) {
     console.error('Failed to change job lifecycle', error);
@@ -161,11 +161,11 @@ export const updateJobLifecycle = async (req: AuthRequest, res: Response): Promi
 
 export const getRecruiterJobs = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    await Job.updateMany({ recruiter: req.user._id, status: { $exists: false } }, { $set: { status: 'Open' } });
+    await Job.updateMany({ recruiter: req.user!._id, status: { $exists: false } }, { $set: { status: 'Open' } });
     const { page, limit, skip } = pagination(req.query);
     const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
     const status = typeof req.query.status === 'string' ? req.query.status : '';
-    const filter: Record<string, unknown> = { recruiter: req.user._id };
+    const filter: Record<string, unknown> = { recruiter: req.user!._id };
     if (q) filter.$or = ['title', 'description', 'location'].map((field) => ({ [field]: { $regex: escapeRegex(q), $options: 'i' } }));
     if (['Open', 'Closed', 'Archived'].includes(status)) filter.status = status;
     const [items, total] = await Promise.all([
