@@ -406,3 +406,15 @@ A laptop-format, single-column tour of the HireFlow candidate and recruiter work
 **12 · Recruitment analytics** — Frontend + API · Hiring performance insights
 
 <img src="docs/images/dashboard-12.svg" alt="HireFlow recruiter recruitment analytics dashboard, frontend and API" width="100%" />
+
+
+
+---
+
+## Author
+
+**Matiur Rahaman** — MERN Full-Stack Developer  
+GitHub: https://github.com/matiur25580  
+Email: rahamanmatiur397@gmail.com
+
+Built as a solo project - React + TypeScript frontend, Node.js + Express backend, MongoDB, JWT Auth, Cloudinary resume upload and Gemini AI matching.
