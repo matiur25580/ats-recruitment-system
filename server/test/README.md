@@ -22,7 +22,8 @@ Use a dedicated disposable test database. The integration suite drops that datab
 ## Coverage
 
 - Public registration cannot assign privileged roles; duplicate registration and login behavior
-- Bearer token validation and role-based endpoint restrictions
+- Bearer token validation for missing, malformed, expired, incorrectly signed and stale-session tokens; role-based endpoint restrictions
+- Login password verification is performed exactly once for an existing account with an incorrect password
 - Recruiter job creation, ownership checks, job closing, and rejection of applications to closed jobs
 - Duplicate application prevention before external resume storage is called
 - Candidate response privacy (no recruiter notes or private storage identifiers)

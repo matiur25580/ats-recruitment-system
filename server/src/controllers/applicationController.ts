@@ -49,7 +49,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
     }
 
     // Check before uploading: a duplicate request should not create an orphaned file.
-    const alreadyApplied = await Application.findOne({ job: jobId, candidate: req.user._id });
+    const alreadyApplied = await Application.findOne({ job: jobId, candidate: req.user!._id });
     if (alreadyApplied) { res.status(400).json({ message: 'You have already applied' }); return; }
 
     const result = await uploadToCloudinary(req.file.buffer);
@@ -58,17 +58,17 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
     const aiAnalysis = await analyzeResumeWithAI(req.file.buffer, job.description, job.requirements);
 
     const application = new Application({
-      job: jobId, candidate: req.user._id, coverLetter,
+      job: jobId, candidate: req.user!._id, coverLetter,
       resumePublicId: result.public_id,
       matchScore: aiAnalysis?.matchScore,
       aiSummary: aiAnalysis?.aiSummary,
       aiAnalysisStatus: aiAnalysis ? 'completed' : 'unavailable',
-      statusHistory: [{ status: 'Pending', changedBy: req.user._id, changedAt: new Date() }],
+      statusHistory: [{ status: 'Pending', changedBy: req.user!._id, changedAt: new Date() }],
     });
 
     await application.save();
     uploadedPublicId = undefined;
-    await recordAuditEvent({ actorId: req.user._id, action: 'application.submitted', entityType: 'Application', entityId: application._id, metadata: { jobId: job._id }, requestId: req.header('x-request-id') });
+    await recordAuditEvent({ actorId: req.user!._id, action: 'application.submitted', entityType: 'Application', entityId: application._id, metadata: { jobId: job._id }, requestId: req.header('x-request-id') });
 
     // রিক্রুটারকে ইমেইল পাঠানো
     const recruiter = job.recruiter as any;
@@ -76,7 +76,7 @@ export const applyForJob = async (req: AuthRequest, res: Response): Promise<void
       sendEmail(
         recruiter.email,
         `New Application for ${job.title}`,
-        `Hello ${recruiter.name},\n\n${req.user.name} has applied for your job "${job.title}".\nAI Match Score: ${aiAnalysis ? `${aiAnalysis.matchScore}%` : 'unavailable'}\n\nLogin to your dashboard to view the resume.`
+        `Hello ${recruiter.name},\n\n${req.user!.name} has applied for your job "${job.title}".\nAI Match Score: ${aiAnalysis ? `${aiAnalysis.matchScore}%` : 'unavailable'}\n\nLogin to your dashboard to view the resume.`
       );
     }
 
@@ -106,8 +106,8 @@ export const getApplicationResume = async (req: AuthRequest, res: Response): Pro
     const job = await Job.findById(application.job).select('recruiter');
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
 
-    const isCandidate = application.candidate.toString() === req.user._id.toString();
-    const isRecruiter = job.recruiter.toString() === req.user._id.toString();
+    const isCandidate = application.candidate.toString() === req.user!._id.toString();
+    const isRecruiter = job.recruiter.toString() === req.user!._id.toString();
     if (!isCandidate && !isRecruiter) { res.status(403).json({ message: 'Not authorized' }); return; }
     if (!application.resumePublicId) { res.status(404).json({ message: 'Resume not available' }); return; }
 
@@ -131,7 +131,7 @@ export const getJobApplications = async (req: AuthRequest, res: Response): Promi
     const { jobId } = req.params;
     const job = await Job.findById(jobId);
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
-    if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
+    if (job.recruiter.toString() !== req.user!._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
     
     const pageValue = Number(req.query.page ?? 1);
     const limitValue = Number(req.query.limit ?? 10);
@@ -182,7 +182,7 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     
     const job = application.job as any;
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
-    if (job.recruiter.toString() !== req.user._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
+    if (job.recruiter.toString() !== req.user!._id.toString()) { res.status(403).json({ message: 'Not authorized' }); return; }
 
     // Repeated requests are idempotent: do not create duplicate audit entries or send duplicate emails.
     if (application.status === status) {
@@ -203,9 +203,9 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
 
     const previousStatus = application.status;
     application.status = status;
-    application.statusHistory.push({ status, changedBy: req.user._id, changedAt: new Date() });
+    application.statusHistory.push({ status, changedBy: req.user!._id, changedAt: new Date() });
     await application.save();
-    await recordAuditEvent({ actorId: req.user._id, action: 'application.status_changed', entityType: 'Application', entityId: application._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
+    await recordAuditEvent({ actorId: req.user!._id, action: 'application.status_changed', entityType: 'Application', entityId: application._id, metadata: { from: previousStatus, to: status }, requestId: req.header('x-request-id') });
 
     // ক্যান্ডিডেটকে ইমেইল পাঠানো
     const candidate = application.candidate as any;
@@ -231,7 +231,7 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
 export const getCandidateApplications = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     // Recruiter notes are private hiring-team data and must never reach candidate-facing APIs.
-    const applications = await Application.find({ candidate: req.user._id })
+    const applications = await Application.find({ candidate: req.user!._id })
       .select('-recruiterNotes -resumePublicId')
       .populate('job', 'title location salary jobType')
       .sort({ createdAt: -1 });
@@ -253,12 +253,12 @@ export const addRecruiterNote = async (req: AuthRequest, res: Response): Promise
     if (!application) { res.status(404).json({ message: 'Application not found' }); return; }
     const job = await Job.findById(application.job).select('recruiter');
     if (!job) { res.status(404).json({ message: 'Job not found' }); return; }
-    if (job.recruiter.toString() !== req.user._id.toString()) {
+    if (job.recruiter.toString() !== req.user!._id.toString()) {
       res.status(403).json({ message: 'Not authorized to add notes to this application' }); return;
     }
-    application.recruiterNotes.push({ author: req.user._id, note: note.trim(), createdAt: new Date() });
+    application.recruiterNotes.push({ author: req.user!._id, note: note.trim(), createdAt: new Date() });
     await application.save();
-    await recordAuditEvent({ actorId: req.user._id, action: 'application.note_added', entityType: 'Application', entityId: application._id, metadata: {}, requestId: req.header('x-request-id') });
+    await recordAuditEvent({ actorId: req.user!._id, action: 'application.note_added', entityType: 'Application', entityId: application._id, metadata: {}, requestId: req.header('x-request-id') });
     res.status(201).json({ message: 'Recruiter note added', notes: application.recruiterNotes });
   } catch (error: unknown) {
     console.error('Failed to add recruiter note', error);

@@ -4,14 +4,15 @@
  */
 import { Request, Response, NextFunction } from 'express';
 import jwt, { JwtPayload } from 'jsonwebtoken';
-import User from '../models/User';
+import User, { IUser } from '../models/User';
 
 export interface AuthRequest extends Request {
-  user?: any;
+  /** Populated by protect before authenticated route handlers execute. */
+  user?: IUser;
 }
 
 // Authentication gate: verify identity before protected controllers are allowed to run.
-export const protect = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+export const protect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const authorization = req.headers.authorization;
   const match = authorization?.match(/^Bearer\s+(.+)$/i);
 
@@ -44,7 +45,7 @@ export const protect = async (req: AuthRequest, res: Response, next: NextFunctio
       return;
     }
 
-    req.user = user;
+    (req as AuthRequest).user = user;
     next();
   } catch {
     // Avoid logging token verification errors or token contents.

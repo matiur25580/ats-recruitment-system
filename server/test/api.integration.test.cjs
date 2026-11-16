@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
 const User = require('../dist/models/User').default;
 const Job = require('../dist/models/Job').default;
 const Application = require('../dist/models/Application').default;
@@ -101,11 +102,23 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.equal(unknownEmail.response.status, 404);
       assert.equal(unknownEmail.body.message, 'This email does not exist. Please register first.');
 
-      const wrongPassword = await request('/api/auth/login', {
-        method: 'POST', body: JSON.stringify({ email: 'candidate.integration@example.test', password: 'WrongPass123!' }),
-      });
+      const originalMatchPassword = User.prototype.matchPassword;
+      let passwordComparisonCount = 0;
+      User.prototype.matchPassword = async function (enteredPassword) {
+        passwordComparisonCount += 1;
+        return originalMatchPassword.call(this, enteredPassword);
+      };
+      let wrongPassword;
+      try {
+        wrongPassword = await request('/api/auth/login', {
+          method: 'POST', body: JSON.stringify({ email: 'candidate.integration@example.test', password: 'WrongPass123!' }),
+        });
+      } finally {
+        User.prototype.matchPassword = originalMatchPassword;
+      }
       assert.equal(wrongPassword.response.status, 401);
       assert.equal(wrongPassword.body.message, 'Incorrect password. Please try again.');
+      assert.equal(passwordComparisonCount, 1, 'an existing account password should be compared exactly once');
     });
 
     await t.test('missing, malformed and wrong-role credentials are rejected', async () => {
@@ -113,6 +126,35 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       assert.equal(missing.response.status, 401);
       const invalid = await request('/api/jobs/mine', { headers: bearer('not-a-jwt') });
       assert.equal(invalid.response.status, 401);
+
+      const malformedHeader = await request('/api/jobs/mine', { headers: { Authorization: 'Basic not-a-bearer-token' } });
+      assert.equal(malformedHeader.response.status, 401);
+
+      const expiredToken = jwt.sign(
+        { id: String(candidate._id), tokenVersion: candidate.tokenVersion || 0 },
+        process.env.JWT_SECRET,
+        { expiresIn: -1 },
+      );
+      const expired = await request('/api/jobs/mine', { headers: bearer(expiredToken) });
+      assert.equal(expired.response.status, 401);
+
+      const invalidSignatureToken = jwt.sign(
+        { id: String(candidate._id), tokenVersion: candidate.tokenVersion || 0 },
+        'a-different-test-secret-that-is-long-enough',
+      );
+      const invalidSignature = await request('/api/jobs/mine', { headers: bearer(invalidSignatureToken) });
+      assert.equal(invalidSignature.response.status, 401);
+
+      const staleVersionToken = jwt.sign(
+        { id: String(candidate._id), tokenVersion: (candidate.tokenVersion || 0) + 1 },
+        process.env.JWT_SECRET,
+      );
+      const staleVersion = await request('/api/jobs/mine', { headers: bearer(staleVersionToken) });
+      assert.equal(staleVersion.response.status, 401);
+
+      const candidateAdminAccess = await request('/api/admin/overview', { headers: bearer(candidateToken) });
+      assert.equal(candidateAdminAccess.response.status, 403);
+
       const candidateCreate = await request('/api/jobs', {
         method: 'POST', headers: bearer(candidateToken),
         body: JSON.stringify({ title: 'Forbidden', description: 'No', location: 'Remote', salary: 1, jobType: 'Full-time', experienceLevel: 'Entry' }),

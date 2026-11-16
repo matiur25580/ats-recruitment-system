@@ -71,15 +71,15 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
     }
 
     const user = await User.findOne({ email });
-    if (!user || !(await user.matchPassword(password))) {
-      if (!user) {
+    if (!user) {
       res.status(404).json({ message: 'This email does not exist. Please register first.' });
       return;
     }
-    if (!(await user.matchPassword(password))) {
+
+    // Compare the submitted password exactly once; bcrypt is intentionally expensive.
+    const passwordMatches = await user.matchPassword(password);
+    if (!passwordMatches) {
       res.status(401).json({ message: 'Incorrect password. Please try again.' });
-      return;
-    }
       return;
     }
 
