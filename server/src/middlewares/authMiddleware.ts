@@ -7,8 +7,8 @@ import jwt, { JwtPayload } from 'jsonwebtoken';
 import User, { IUser } from '../models/User';
 
 export interface AuthRequest extends Request {
-  /** Present only after the protect middleware has loaded the account from MongoDB. */
-  user: IUser;
+  /** Populated by protect before authenticated route handlers execute. */
+  user?: IUser;
 }
 
 // Authentication gate: verify identity before protected controllers are allowed to run.
