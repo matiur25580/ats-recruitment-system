@@ -4,7 +4,7 @@
 
 **A modern, AI-assisted Applicant Tracking System for candidate discovery and recruiter workflows.**
 
-[![CI](https://github.com/matiur25580/ats-recruitment-system/actions/workflows/ci.yml/badge.svg?branch=upgrade%2Fats-complete-modern)](https://github.com/matiur25580/ats-recruitment-system/actions/workflows/ci.yml)
+[![CI](https://github.com/matiur25580/ats-recruitment-system/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/matiur25580/ats-recruitment-system/actions/workflows/ci.yml)
 [![React](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-22-43853d?logo=node.js&logoColor=white)](https://nodejs.org/)
