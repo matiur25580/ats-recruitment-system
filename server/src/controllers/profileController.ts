@@ -58,7 +58,7 @@ const removeResume = async (publicId: string): Promise<void> => {
 // Controller: handle this HTTP use case, access only the signed-in candidate's record, and return an HTTP response.
 export const getCandidateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req.user._id).select('-password -resumePublicId');
+    const user = await User.findById(req.user!._id).select('-password -resumePublicId');
     if (!user) { res.status(404).json({ message: 'Profile not found' }); return; }
     const profile = user.toObject();
     res.json({ ...profile, hasResume: Boolean(user.resumeFileName) });
@@ -70,7 +70,7 @@ export const getCandidateProfile = async (req: AuthRequest, res: Response): Prom
 
 export const updateCandidateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user!._id);
     if (!user) { res.status(404).json({ message: 'Profile not found' }); return; }
 
     const body = req.body || {};
@@ -117,7 +117,7 @@ export const uploadCandidateResume = async (req: AuthRequest, res: Response): Pr
     if (!req.file || req.file.mimetype !== 'application/pdf' || req.file.buffer.subarray(0, 5).toString() !== '%PDF-') {
       res.status(400).json({ message: 'Please upload a valid PDF resume' }); return;
     }
-    const user = await User.findById(req.user._id).select('+resumePublicId');
+    const user = await User.findById(req.user!._id).select('+resumePublicId');
     if (!user) { res.status(404).json({ message: 'Profile not found' }); return; }
 
     const uploaded = await uploadResume(req.file.buffer, req.file.originalname);
@@ -146,7 +146,7 @@ export const uploadCandidateResume = async (req: AuthRequest, res: Response): Pr
 
 export const getCandidateResume = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req.user._id).select('+resumePublicId resumeFileName');
+    const user = await User.findById(req.user!._id).select('+resumePublicId resumeFileName');
     if (!user?.resumePublicId) { res.status(404).json({ message: 'No resume has been uploaded yet' }); return; }
     const expiresAt = Math.floor(Date.now() / 1000) + 60;
     const url = cloudinary.utils.private_download_url(user.resumePublicId, 'pdf', {
@@ -161,7 +161,7 @@ export const getCandidateResume = async (req: AuthRequest, res: Response): Promi
 
 export const deleteCandidateResume = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const user = await User.findById(req.user._id).select('+resumePublicId');
+    const user = await User.findById(req.user!._id).select('+resumePublicId');
     if (!user?.resumePublicId) { res.status(404).json({ message: 'No resume has been uploaded yet' }); return; }
     const publicId = user.resumePublicId;
     user.resumePublicId = undefined;
