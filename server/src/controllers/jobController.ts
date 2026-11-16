@@ -2,7 +2,7 @@
  * LEARNING NOTE: Job handlers enforce recruiter ownership and explicit lifecycle transitions at the API boundary.
  * Interview tip: explain why clients never supply the recruiter ID and why closed jobs cannot receive applications.
  */
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import Job from '../models/Job';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { recordAuditEvent } from '../utils/audit';
@@ -54,7 +54,7 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
   }
 };
 
-const pagination = (query: AuthRequest['query']) => {
+const pagination = (query: Request['query']) => {
   const pageValue = Number(query.page ?? 1);
   const limitValue = Number(query.limit ?? 12);
   const page = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
@@ -68,7 +68,7 @@ const escapeRegex = (value: string): string => {
   return value.split('').map((character) => special.includes(character) ? slash + character : character).join('');
 };
 
-export const getJobs = async (req: AuthRequest, res: Response): Promise<void> => {
+export const getJobs = async (req: Request, res: Response): Promise<void> => {
   try {
     const { page, limit, skip } = pagination(req.query);
     const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 100) : '';
