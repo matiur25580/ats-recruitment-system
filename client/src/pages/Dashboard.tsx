@@ -17,10 +17,10 @@ import toast from 'react-hot-toast';
 import api from '../services/api';
 
 type User = { _id: string; name: string; email?: string; role: 'candidate' | 'recruiter' | 'admin' };
-type Job = { _id: string; title: string; description: string; location: string; salary: number; jobType: string; experienceLevel?: string; recruiter?: any; status?: 'Open' | 'Closed' | 'Archived'; expiresAt?: string };
+type Job = { _id: string; title: string; description: string; companyName?: string; vacancies?: number; requirements?: string[]; location: string; salary: number; jobType: string; experienceLevel?: string; recruiter?: any; status?: 'Open' | 'Closed' | 'Archived'; expiresAt?: string };
 type Application = { _id: string; job?: any; candidate?: any; coverLetter?: string; status: string; matchScore?: number; aiSummary?: string; aiAnalysisStatus?: string; resumePublicId?: string; statusHistory?: { status: string; changedBy: string; changedAt: string }[]; recruiterNotes?: { author: string; note: string; createdAt: string }[] };
 
-const initialForm = { title: '', description: '', requirements: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry', expiresAt: '' };
+const initialForm = { title: '', companyName: '', description: '', requirements: '', vacancies: '', location: '', salary: '', jobType: 'Full-time', experienceLevel: 'Entry', expiresAt: '' };
 const chartColors = ['#64748b', '#8b5cf6', '#10b981', '#f97316'];
 
 // Dashboard page: use the signed-in role to decide which recruitment tools and data should be shown.
@@ -42,6 +42,8 @@ const Dashboard = () => {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [jobTypeFilter, setJobTypeFilter] = useState('');
+  const [experienceFilter, setExperienceFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [jobPage, setJobPage] = useState(1);
   const [jobPagination, setJobPagination] = useState({ page: 1, totalPages: 1, total: 0 });
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -97,6 +99,8 @@ const Dashboard = () => {
       const params: Record<string, string | number> = { page, limit: 12 };
       if (searchTerm.trim()) params.q = searchTerm.trim();
       if (current.role !== 'recruiter' && jobTypeFilter) params.jobType = jobTypeFilter;
+      if (current.role !== 'recruiter' && experienceFilter) params.experienceLevel = experienceFilter;
+      if (current.role !== 'recruiter' && locationFilter.trim()) params.location = locationFilter.trim();
       const response = await api.get(current.role === 'recruiter' ? '/jobs/mine' : '/jobs', { params });
       setJobs(Array.isArray(response.data?.items) ? response.data.items : []);
       setJobPagination(response.data?.pagination || { page: 1, totalPages: 1, total: 0 });
@@ -115,6 +119,8 @@ const Dashboard = () => {
     try {
       const payload = {
         ...formData,
+        companyName: formData.companyName.trim(),
+        vacancies: formData.vacancies ? Number(formData.vacancies) : undefined,
         title: formData.title.trim(),
         description: formData.description.trim(),
         salary: Number(formData.salary),
@@ -167,7 +173,7 @@ const Dashboard = () => {
 
   const handleEditJob = (job: Job) => {
     setEditingJobId(job._id);
-    setFormData({ title: job.title, description: job.description, requirements: '', location: job.location, salary: String(job.salary), jobType: job.jobType, experienceLevel: job.experienceLevel || 'Entry', expiresAt: job.expiresAt ? new Date(job.expiresAt).toISOString().slice(0, 10) : '' });
+    setFormData({ title: job.title, companyName: job.companyName || '', description: job.description, requirements: '', vacancies: job.vacancies ? String(job.vacancies) : '', location: job.location, salary: String(job.salary), jobType: job.jobType, experienceLevel: job.experienceLevel || 'Entry', expiresAt: job.expiresAt ? new Date(job.expiresAt).toISOString().slice(0, 10) : '' });
     setShowJobForm(true);
   };
 
@@ -305,7 +311,7 @@ const Dashboard = () => {
                 <div><h3 className="text-lg font-bold">{isRecruiter ? 'Your job postings' : 'Explore opportunities'}</h3><p className="text-sm text-slate-400">{isRecruiter ? 'Keep track of roles and review applicants.' : 'Find a role that matches your experience.'}</p></div>
                 <div className="flex flex-wrap gap-2">
                   <div className="relative min-w-0 flex-1 sm:w-52"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={searchTerm} onChange={event=>setSearchTerm(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&user)void loadJobs(user,1);}} placeholder="Search jobs…" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"/></div>
-                  {!isRecruiter && <select value={jobTypeFilter} onChange={event=>setJobTypeFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">All types</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option></select>}
+                  {!isRecruiter && <><select value={jobTypeFilter} onChange={event=>setJobTypeFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">All types</option><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option></select><select value={experienceFilter} onChange={event=>setExperienceFilter(event.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"><option value="">All experience</option><option value="Entry">Fresher / Entry</option><option value="Mid">2–5 years</option><option value="Senior">5+ years</option></select><input value={locationFilter} onChange={event=>setLocationFilter(event.target.value)} onKeyDown={event=>{if(event.key==='Enter'&&user)void loadJobs(user,1);}} placeholder="Location" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm sm:w-32"/></>}
                   <button onClick={()=>user&&void loadJobs(user,1)} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-sm font-semibold text-violet-700">Search</button>
                   {isRecruiter && <button onClick={()=>setShowJobForm(true)} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"><Plus size={16}/><span className="hidden sm:inline">New job</span></button>}
                 </div>
@@ -313,9 +319,9 @@ const Dashboard = () => {
               {filteredJobs.length === 0 ? <EmptyState title={searchTerm ? 'No matching jobs' : 'Nothing here yet'} detail={searchTerm ? 'Try another search term.' : isRecruiter ? 'Publish your first role to start receiving applications.' : 'There are no open roles available right now.'}/> : <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {filteredJobs.map(job=><article key={job._id} className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 transition hover:border-violet-200 hover:bg-white hover:shadow-md sm:p-5">
                   <div className="flex items-start justify-between gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700"><BriefcaseBusiness size={19}/></div><span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${job.status === 'Archived' ? 'bg-slate-100 text-slate-600' : (job.status || 'Open') === 'Closed' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{job.status || 'Open'}</span></div>
-                  <h4 className="mt-3 text-base font-bold">{job.title}</h4><p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{job.description}</p>
-                  <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><MapPin size={13}/>{job.location}</span><span className="inline-flex items-center gap-1"><Clock3 size={13}/>{job.jobType}</span>{job.salary > 0 && <span className="font-semibold text-slate-700">Salary: {job.salary.toLocaleString()}</span>}</div>
-                  <div className="mt-4 border-t border-slate-200/70 pt-3">{isRecruiter ? <div className="flex flex-wrap items-center gap-3"><button onClick={()=>handleViewApplicants(job)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-700 hover:text-violet-900">Applicants <ArrowUpRight size={15}/></button><button onClick={()=>handleEditJob(job)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-violet-700"><Pencil size={13}/> Edit</button>{(job.status || 'Open') === 'Open' ? <button onClick={()=>void handleJobLifecycle(job,'Closed')} className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><Ban size={13}/> Close</button> : job.status === 'Closed' ? <button onClick={()=>void handleJobLifecycle(job,'Open')} className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><RefreshCw size={13}/> Reopen</button> : null}{(job.status || 'Open') !== 'Archived' && <button onClick={()=>void handleJobLifecycle(job,'Archived')} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500"><Archive size={13}/> Archive</button>}</div> : <button disabled={job.status !== 'Open'} onClick={()=>setApplyJobId(job._id)} className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">{job.status === 'Open' ? 'Apply for this role' : 'Applications closed'} <ArrowUpRight size={15} className="ml-1 inline"/></button>}</div>
+                  <h4 className="mt-3 text-base font-bold">{job.title}</h4>{job.companyName && <p className="mt-0.5 text-xs font-semibold text-violet-700">{job.companyName}</p>}<p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{job.description}</p>
+                  <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500"><span className="inline-flex items-center gap-1"><MapPin size={13}/>{job.location}</span><span className="inline-flex items-center gap-1"><Clock3 size={13}/>{job.jobType}</span><span>{job.experienceLevel === 'Entry' ? 'Fresher / Entry' : job.experienceLevel === 'Mid' ? '2–5 years' : job.experienceLevel === 'Senior' ? '5+ years' : 'Experience not specified'}</span><span>{job.vacancies ? `${job.vacancies} openings` : 'Vacancies not disclosed'}</span>{job.expiresAt && <span>Apply by {new Date(job.expiresAt).toLocaleDateString()}</span>}{job.salary > 0 && <span className="font-semibold text-slate-700">Salary: {job.salary.toLocaleString()}</span>}</div>
+                  <div className="mt-3 flex flex-wrap gap-1.5">{(job.requirements || []).slice(0, 5).map((skill, index) => <span key={`${job._id}-skill-${index}`} className="rounded-md bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">{skill}</span>)}</div><div className="mt-4 border-t border-slate-200/70 pt-3">{isRecruiter ? <div className="flex flex-wrap items-center gap-3"><button onClick={()=>handleViewApplicants(job)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-700 hover:text-violet-900">Applicants <ArrowUpRight size={15}/></button><button onClick={()=>handleEditJob(job)} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-violet-700"><Pencil size={13}/> Edit</button>{(job.status || 'Open') === 'Open' ? <button onClick={()=>void handleJobLifecycle(job,'Closed')} className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700"><Ban size={13}/> Close</button> : job.status === 'Closed' ? <button onClick={()=>void handleJobLifecycle(job,'Open')} className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><RefreshCw size={13}/> Reopen</button> : null}{(job.status || 'Open') !== 'Archived' && <button onClick={()=>void handleJobLifecycle(job,'Archived')} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500"><Archive size={13}/> Archive</button>}</div> : <button disabled={job.status !== 'Open'} onClick={()=>setApplyJobId(job._id)} className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">{job.status === 'Open' ? 'Apply for this role' : 'Applications closed'} <ArrowUpRight size={15} className="ml-1 inline"/></button>}</div>
                 </article>)}
               </div>}
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
@@ -335,8 +341,10 @@ const Dashboard = () => {
       </div>
 
       {showJobForm && <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"><div className="my-6 w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl sm:p-7"><div className="mb-5 flex items-start justify-between"><div><p className="text-xs font-bold uppercase tracking-widest text-violet-600">Recruiting</p><h3 className="mt-1 text-xl font-bold">{editingJobId ? 'Edit job posting' : 'Publish a new role'}</h3><p className="text-sm text-slate-400">Share the details candidates need to apply.</p></div><button onClick={()=>{setShowJobForm(false);setEditingJobId(null);setFormData(initialForm);}} className="rounded-xl border border-slate-200 p-2 text-slate-500" aria-label="Close form"><X size={18}/></button></div><form onSubmit={handlePostJob} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field label="Company name (optional)"><input value={formData.companyName} onChange={e=>setFormData({...formData,companyName:e.target.value})} placeholder="e.g. Your company" className="field-input"/></Field>
         <Field label="Job title"><input required value={formData.title} onChange={e=>setFormData({...formData,title:e.target.value})} placeholder="e.g. Product Designer" className="field-input"/></Field>
         <Field label="Location"><input required value={formData.location} onChange={e=>setFormData({...formData,location:e.target.value})} placeholder="Remote / City" className="field-input"/></Field>
+        <Field label="Number of vacancies (optional)"><input min="1" type="number" value={formData.vacancies} onChange={e=>setFormData({...formData,vacancies:e.target.value})} placeholder="Leave blank if not confirmed" className="field-input"/></Field>
         <Field label="Salary"><input required min="0" type="number" value={formData.salary} onChange={e=>setFormData({...formData,salary:e.target.value})} placeholder="Annual salary" className="field-input"/></Field>
         <Field label="Job type"><select value={formData.jobType} onChange={e=>setFormData({...formData,jobType:e.target.value})} className="field-input"><option>Full-time</option><option>Part-time</option><option>Contract</option><option>Internship</option></select></Field>
         <Field label="Experience level"><select value={formData.experienceLevel} onChange={e=>setFormData({...formData,experienceLevel:e.target.value})} className="field-input"><option>Entry</option><option>Mid</option><option>Senior</option></select></Field>

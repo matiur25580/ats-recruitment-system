@@ -9,6 +9,8 @@ export type JobStatus = 'Open' | 'Closed' | 'Archived';
 export interface IJob extends Document {
   title: string;
   description: string;
+  companyName?: string;
+  vacancies?: number;
   requirements: string[];
   location: string;
   salary: number;
@@ -23,6 +25,8 @@ const jobSchema: Schema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
+    companyName: { type: String, trim: true, maxlength: 120 },
+    vacancies: { type: Number, min: 1 },
     requirements: [{ type: String, trim: true }],
     location: { type: String, required: true, trim: true },
     salary: { type: Number, required: true, min: 0 },

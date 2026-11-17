@@ -13,6 +13,8 @@ const allowedExperienceLevels = ['Entry', 'Mid', 'Senior'] as const;
 const validJobDetails = (body: any): boolean =>
   typeof body.title === 'string' && !!body.title.trim() &&
   typeof body.description === 'string' && !!body.description.trim() &&
+  (body.companyName === undefined || (typeof body.companyName === 'string' && body.companyName.length <= 120)) &&
+  (body.vacancies === undefined || (Number.isInteger(Number(body.vacancies)) && Number(body.vacancies) >= 1)) &&
   typeof body.location === 'string' && !!body.location.trim() &&
   Number.isFinite(Number(body.salary)) && Number(body.salary) >= 0 &&
   allowedJobTypes.includes(body.jobType) &&
@@ -23,6 +25,8 @@ const validJobDetails = (body: any): boolean =>
 const normalizedJobDetails = (body: any) => ({
   title: body.title.trim(),
   description: body.description.trim(),
+  companyName: typeof body.companyName === 'string' ? body.companyName.trim() : undefined,
+  vacancies: body.vacancies !== undefined && body.vacancies !== '' ? Number(body.vacancies) : undefined,
   location: body.location.trim(),
   salary: Number(body.salary),
   jobType: body.jobType,
