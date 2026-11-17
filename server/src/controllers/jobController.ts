@@ -25,8 +25,8 @@ const validJobDetails = (body: any): boolean =>
 const normalizedJobDetails = (body: any) => ({
   title: body.title.trim(),
   description: body.description.trim(),
-  ...(typeof body.companyName === 'string' && body.companyName.trim() ? { companyName: body.companyName.trim() } : {}),
-  ...(body.vacancies !== undefined && body.vacancies !== '' ? { vacancies: Number(body.vacancies) } : {}),
+  companyName: typeof body.companyName === 'string' ? body.companyName.trim() : undefined,
+  vacancies: body.vacancies !== undefined && body.vacancies !== '' ? Number(body.vacancies) : undefined,
   location: body.location.trim(),
   salary: Number(body.salary),
   jobType: body.jobType,
