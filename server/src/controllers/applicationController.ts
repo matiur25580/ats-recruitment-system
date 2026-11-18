@@ -223,8 +223,9 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response): 
     }
 
     res.json({ message: 'Status updated successfully', application });
-  } catch (error: any) {
-    res.status(500).json({ message: error.message });
+  } catch (error: unknown) {
+    console.error('Failed to update application status', error);
+    res.status(500).json({ message: 'Unable to update application status' });
   }
 };
 
