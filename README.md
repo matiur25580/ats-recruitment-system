@@ -418,3 +418,9 @@ GitHub: https://github.com/matiur25580
 Email: rahamanmatiur397@gmail.com
 
 Built as a solo project - React + TypeScript frontend, Node.js + Express backend, MongoDB, JWT Auth, Cloudinary resume upload and Gemini AI matching.
+
+## Live Demo
+
+**Frontend:** [Open Live Demo](https://ats-recruitment-system-nu.vercel.app)
+
+> This link points to the deployed frontend. Features that depend on the API, database, email, file storage, or other external services may require the corresponding backend services and environment variables to be configured. Use test data only; this demo is not a production service.
