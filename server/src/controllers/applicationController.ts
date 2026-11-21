@@ -158,7 +158,13 @@ export const getJobApplications = async (req: AuthRequest, res: Response): Promi
       Application.find(filter).populate('candidate', 'name email').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit),
       Application.countDocuments(filter),
     ]);
-    res.json({ items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
+    const safeItems = items.map((item) => {
+      const application = item.toObject();
+      const hasResume = Boolean(application.resumePublicId);
+      delete application.resumePublicId;
+      return { ...application, hasResume };
+    });
+    res.json({ items: safeItems, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch (error: unknown) {
     console.error('Failed to retrieve job applications', error);
     res.status(500).json({ message: 'Unable to retrieve applications' });
