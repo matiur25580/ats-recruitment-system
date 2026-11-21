@@ -252,6 +252,8 @@ test('MongoDB-backed API integration: auth, roles, job ownership, applications a
       const recruiterApps = await request(`/api/applications/${job._id}`, { headers: bearer(recruiterToken) });
       assert.equal(recruiterApps.response.status, 200);
       assert.equal(recruiterApps.body.items[0].recruiterNotes[0].note, 'Internal screening note');
+      assert.equal(recruiterApps.body.items[0].hasResume, true);
+      assert.equal(Object.hasOwn(recruiterApps.body.items[0], 'resumePublicId'), false);
 
       const filteredApplicants = await request(`/api/applications/${job._id}?page=1&limit=1&q=Integration&status=Pending`, { headers: bearer(recruiterToken) });
       assert.equal(filteredApplicants.response.status, 200);
