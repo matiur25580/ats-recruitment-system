@@ -11,6 +11,7 @@ type AuditInput = {
 };
 
 // Audit records deliberately store state changes and safe metadata, never credentials or resume contents.
+// Capture who changed which entity while deliberately excluding secrets and uploaded document contents.
 export const recordAuditEvent = async (input: AuditInput): Promise<void> => {
   try {
     await AuditLog.create({
