@@ -101,6 +101,7 @@ export const loginUser = async (req: Request, res: Response): Promise<void> => {
  * Always return the same response to prevent the password-reset endpoint from
  * revealing whether an email address has an account.
  */
+// Keep reset responses identical for existing and unknown emails to prevent account enumeration.
 export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
   const genericMessage = 'If an account exists for this email, password reset instructions will be sent shortly.';
   try {
