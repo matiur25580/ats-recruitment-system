@@ -67,6 +67,7 @@ const pagination = (query: Request['query']) => {
   return { page, limit, skip: (page - 1) * limit };
 };
 
+// Escape user-provided search text before embedding it in a MongoDB regular expression.
 const escapeRegex = (value: string): string => {
   const slash = String.fromCharCode(92);
   const special = '.+*?^$()[]{}|' + slash;
