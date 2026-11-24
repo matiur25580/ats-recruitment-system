@@ -58,6 +58,7 @@ export const createJob = async (req: AuthRequest, res: Response): Promise<void> 
   }
 };
 
+// Clamp pagination inputs so public job searches cannot request unbounded result sets.
 const pagination = (query: Request['query']) => {
   const pageValue = Number(query.page ?? 1);
   const limitValue = Number(query.limit ?? 12);
